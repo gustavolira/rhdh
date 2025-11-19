@@ -1,11 +1,9 @@
 developerHub:
   flavor: rhdh
 app:
-  title: RHDH
+  title: Red Hat Developer Hub
   baseUrl: http://localhost:3000
   branding:
-    fullLogo: ${BASE64_EMBEDDED_FULL_LOGO}
-    iconLogo: ${BASE64_EMBEDDED_ICON_LOGO}
     fullLogoWidth: ${FULL_LOGO_WIDTH}
     theme:
       light:

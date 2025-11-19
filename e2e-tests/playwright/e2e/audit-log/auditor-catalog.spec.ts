@@ -4,7 +4,6 @@ import { UIhelper } from "../../utils/ui-helper";
 import { LogUtils } from "./log-utils";
 import { CatalogImport } from "../../support/pages/catalog-import";
 import { APIHelper } from "../../utils/api-helper";
-
 const template =
   "https://github.com/RoadieHQ/sample-service/blob/main/demo_template.yaml";
 const entityName = "hello-world-2";
@@ -32,18 +31,25 @@ test.describe.serial("Audit Log check for Catalog Plugin", () => {
   let common: Common;
   let catalogImport: CatalogImport;
 
+  test.beforeAll(async () => {
+    test.info().annotations.push({
+      type: "component",
+      description: "audit-log",
+    });
+  });
+
   test.beforeEach(async ({ page }) => {
     uiHelper = new UIhelper(page);
     common = new Common(page);
     catalogImport = new CatalogImport(page);
     await common.loginAsGuest();
-    await page.goto("/create");
+    await uiHelper.goToPageUrl("/create", "Self-service");
   });
 
   test("Should fetch logs for entity-mutate event and validate log structure and values", async () => {
     // Ensure the entity exists
     await ensureEntityExists();
-    await uiHelper.clickButton("Register Existing Component");
+    await uiHelper.clickButton("Import an existing Git repository");
     // Register as existing (should trigger entity-mutate)
     await catalogImport.registerExistingComponent(template, false);
     await LogUtils.validateLogEvent(
@@ -61,7 +67,7 @@ test.describe.serial("Audit Log check for Catalog Plugin", () => {
 
   test("Should fetch logs for location-mutate event and validate log structure and values", async () => {
     await ensureEntityDoesNotExist();
-    await uiHelper.clickButton("Register Existing Component");
+    await uiHelper.clickButton("Import an existing Git repository");
     // Register as new (should trigger location-mutate)
     await catalogImport.registerExistingComponent(template, false);
     await LogUtils.validateLogEvent(

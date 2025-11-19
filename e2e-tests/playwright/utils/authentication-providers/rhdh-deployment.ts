@@ -15,7 +15,7 @@ const currentFileName = fileURLToPath(import.meta.url);
 const currentDirName = dirname(currentFileName);
 const rootDirName = resolve(currentDirName, "..", "..", "..", "..");
 const syncedLogRegex =
-  /Committed \d+ (Keycloak|msgraph|GitHub) users? and \d+ (Keycloak|msgraph|GitHub) groups? in \d+(\.\d+)? seconds/;
+  /Committed \d+ (Keycloak|msgraph|GitHub|LDAP) users? and \d+ (Keycloak|msgraph|GitHub|LDAP) groups? in \d+(\.\d+)? seconds/;
 
 class RHDHDeployment {
   instanceName: string;
@@ -607,7 +607,9 @@ class RHDHDeployment {
         );
         return;
       } catch (error) {
-        console.log(`Timeout waiting for Backstage CRD to be available: ${error.message}`)
+        console.log(
+          `Timeout waiting for Backstage CRD to be available: ${error.message}`,
+        );
         if (Date.now() - startTime >= timeoutMs) {
           throw new Error(
             `Timeout waiting for Backstage CRD to be available: ${error.message}`,
@@ -687,7 +689,7 @@ class RHDHDeployment {
         }
       } catch (error) {
         // Expected error - connection refused
-        console.log("Homepage is not accessible as expected");
+        console.log("Homepage is not accessible as expected: ", error);
       }
     } else {
       console.log("No running process to kill.");
@@ -767,7 +769,7 @@ class RHDHDeployment {
       });
 
       // Keep the function alive to allow streaming
-      // eslint-disable-next-line no-constant-condition
+
       while (Date.now() - startTime < timeoutMs && !found) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
@@ -1000,6 +1002,72 @@ class RHDHDeployment {
     return this;
   }
 
+  async enableLDAPLoginWithIngestion(): Promise<RHDHDeployment> {
+    console.log("Enabling LDAP login with ingestion...");
+    //expect the config variable to be set
+    expect(process.env.RHBK_BASE_URL).toBeDefined();
+    expect(process.env.RHBK_LDAP_REALM).toBeDefined();
+    expect(process.env.RHBK_LDAP_CLIENT_ID).toBeDefined();
+    expect(process.env.RHBK_LDAP_CLIENT_SECRET).toBeDefined();
+
+    // enable the catalog backend dynamic plugin
+    // and set the required configuration properties
+    this.setDynamicPluginEnabled(
+      "./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-ldap-dynamic",
+      true,
+    );
+    this.setAppConfigProperty("catalog.providers", {
+      ldapOrg: {
+        default: {
+          target: "${LDAP_TARGET_URL}",
+          bind: {
+            dn: "${LDAP_BIND_DN}",
+            secret: "${LDAP_BIND_SECRET}",
+          },
+          users: [
+            {
+              dn: "${LDAP_USERS_DN}",
+              options: {
+                filter: "(uid=*)",
+                scope: "sub",
+              },
+            },
+          ],
+          groups: [
+            {
+              dn: "${LDAP_GROUPS_DN}",
+              options: {
+                filter:
+                  "(&(objectClass=group)(groupType:1.2.840.113556.1.4.803:=2147483648))", // filter only security groups
+                scope: "sub",
+              },
+            },
+          ],
+          schedule: {
+            frequency: "PT1M",
+            timeout: "PT1M",
+          },
+        },
+      },
+    });
+
+    // enable the keycloak login provider
+    this.setAppConfigProperty("auth.providers.oidc", {
+      production: {
+        metadataUrl: "${RHBK_BASE_URL}/realms/${RHBK_LDAP_REALM}",
+        clientId: "${RHBK_LDAP_CLIENT_ID}",
+        clientSecret: "${RHBK_LDAP_CLIENT_SECRET}",
+        prompt: "auto",
+        callbackUrl:
+          "${BASE_URL:-http://localhost:7007}/api/auth/oidc/handler/frame",
+      },
+    });
+    this.setAppConfigProperty("auth.environment", "production");
+    this.setAppConfigProperty("signInPage", "oidc");
+
+    return this;
+  }
+
   async enableMicrosoftLoginWithIngestion(): Promise<RHDHDeployment> {
     console.log("Enabling Microsoft login with ingestion...");
     //expect the config variable to be set
@@ -1154,7 +1222,7 @@ class RHDHDeployment {
 
   async generateStaticToken(): Promise<RHDHDeployment> {
     const token = uuidv4();
-    this.addSecretData("STATIC_TOKEN", token);
+    await this.addSecretData("STATIC_TOKEN", token);
     this.staticToken = token;
     return this;
   }
@@ -1262,8 +1330,8 @@ class RHDHDeployment {
 
   async checkUserIsIngestedInCatalog(users: string[]) {
     const api = new APIHelper();
-    api.UseStaticToken(this.staticToken);
-    api.UseBaseUrl(await this.computeBackstageBackendUrl());
+    await api.UseStaticToken(this.staticToken);
+    await api.UseBaseUrl(await this.computeBackstageBackendUrl());
     const response = await api.getAllCatalogUsersFromAPI();
     const catalogUsers: UserEntity[] =
       response && response.items ? response.items : [];
@@ -1282,8 +1350,8 @@ class RHDHDeployment {
 
   async checkGroupIsIngestedInCatalog(groups: string[]) {
     const api = new APIHelper();
-    api.UseStaticToken(this.staticToken);
-    api.UseBaseUrl(await this.computeBackstageBackendUrl());
+    await api.UseStaticToken(this.staticToken);
+    await api.UseBaseUrl(await this.computeBackstageBackendUrl());
     const response = await api.getAllCatalogGroupsFromAPI();
     const catalogGroups: GroupEntity[] =
       response && response.items ? response.items : [];
@@ -1302,8 +1370,8 @@ class RHDHDeployment {
 
   async checkUserIsInGroup(user: string, group: string): Promise<boolean> {
     const api = new APIHelper();
-    api.UseStaticToken(this.staticToken);
-    api.UseBaseUrl(await this.computeBackstageBackendUrl());
+    await api.UseStaticToken(this.staticToken);
+    await api.UseBaseUrl(await this.computeBackstageBackendUrl());
     const groupEntity: GroupEntity = await api.getGroupEntityFromAPI(group);
     const members = this.parseGroupMemberFromEntity(groupEntity);
     console.log(
@@ -1317,8 +1385,8 @@ class RHDHDeployment {
     child: string,
   ): Promise<boolean> {
     const api = new APIHelper();
-    api.UseStaticToken(this.staticToken);
-    api.UseBaseUrl(await this.computeBackstageBackendUrl());
+    await api.UseStaticToken(this.staticToken);
+    await api.UseBaseUrl(await this.computeBackstageBackendUrl());
     const groupEntity: GroupEntity = await api.getGroupEntityFromAPI(parent);
     const children = this.parseGroupChildrenFromEntity(groupEntity);
     console.log(
@@ -1332,8 +1400,8 @@ class RHDHDeployment {
     parent: string,
   ): Promise<boolean> {
     const api = new APIHelper();
-    api.UseStaticToken(this.staticToken);
-    api.UseBaseUrl(await this.computeBackstageBackendUrl());
+    await api.UseStaticToken(this.staticToken);
+    await api.UseBaseUrl(await this.computeBackstageBackendUrl());
     const groupEntity: GroupEntity = await api.getGroupEntityFromAPI(child);
     const parents = this.parseGroupParentFromEntity(groupEntity);
     console.log(

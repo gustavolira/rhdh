@@ -1,14 +1,14 @@
 import { Locator, Page, expect, test } from "@playwright/test";
 import { Response, Roles } from "../../../support/pages/rbac";
-import { UI_HELPER_ELEMENTS } from "../../../support/pageObjects/global-obj";
+import { UI_HELPER_ELEMENTS } from "../../../support/page-objects/global-obj";
 import {
   SEARCH_OBJECTS_COMPONENTS,
-  ROLE_OVERVIEW_COMPONENTS,
+  ROLE_OVERVIEW_COMPONENTS_TEST_ID,
   ROLES_PAGE_COMPONENTS,
-} from "../../../support/pageObjects/page-obj";
+} from "../../../support/page-objects/page-obj";
 import { Common, setupBrowser } from "../../../utils/common";
 import { UIhelper } from "../../../utils/ui-helper";
-import { RbacPo } from "../../../support/pageObjects/rbac-po";
+import { RbacPo } from "../../../support/page-objects/rbac-po";
 import { RhdhAuthApiHack } from "../../../support/api/rhdh-auth-api-hack";
 import RhdhRbacApi from "../../../support/api/rbac-api";
 import { RbacConstants } from "../../../data/rbac-constants";
@@ -22,18 +22,25 @@ import { downloadAndReadFile } from "../../../utils/helper";
     https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.3/html/authorization/managing-authorizations-by-using-the-web-ui#proc-rbac-ui-edit-role_title-authorization
 */
 test.describe.serial("Test RBAC", () => {
+  test.beforeAll(async () => {
+    test.info().annotations.push({
+      type: "component",
+      description: "plugins",
+    });
+  });
   test.describe
     .serial("Test RBAC plugin: load permission policies and conditions from files", () => {
     test.beforeEach(async ({ page }) => {
       await new Common(page).loginAsKeycloakUser();
-      await page.goto("/rbac");
+      const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/rbac");
     });
 
     test("Check UI navigation by nav bar when RBAC is enabled", async ({
       page,
     }) => {
-      await page.goto("/");
       const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/", "Welcome back!");
       await uiHelper.openSidebarButton("Administration");
       const dropdownMenuLocator = page.locator(`text="RBAC"`);
       await expect(dropdownMenuLocator).toBeVisible();
@@ -60,7 +67,7 @@ test.describe.serial("Test RBAC", () => {
       await uiHelper.verifyText("csv permission policy file");
 
       await uiHelper.verifyHeading("1 group");
-      await uiHelper.verifyHeading("Permission policies (3)");
+      await uiHelper.verifyHeading("3 Permissions");
       const permissionPoliciesColumnsText =
         Roles.getPermissionPoliciesListColumnsText();
       await uiHelper.verifyColumnHeading(permissionPoliciesColumnsText);
@@ -101,7 +108,7 @@ test.describe.serial("Test RBAC", () => {
     }) => {
       const uiHelper = new UIhelper(page);
       const testUser = "test-rhdh-qe-2";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder(testUser);
@@ -149,7 +156,7 @@ test.describe.serial("Test RBAC", () => {
       const uiHelper = new UIhelper(page);
       // rhdh-qe-parent-team owns mock-site
       const testParentGroup = "rhdh-qe-parent-team";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder("mock-site");
@@ -158,7 +165,7 @@ test.describe.serial("Test RBAC", () => {
 
       // rhdh-qe-child-team owns mock-child-site, check that it can see it's own groups' components
       const testChildGroup = "rhdh-qe-child-team";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder("mock-child-site");
@@ -178,7 +185,7 @@ test.describe.serial("Test RBAC", () => {
       const uiHelper = new UIhelper(page);
       // rhdh-qe-parent-team owns mock-site
       const testParentGroup = "rhdh-qe-parent-team";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder("mock-site");
@@ -187,7 +194,7 @@ test.describe.serial("Test RBAC", () => {
 
       // rhdh-qe-child-team owns mock-child-site
       const testChildGroup = "rhdh-qe-child-team";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder("mock-child-site");
@@ -196,7 +203,7 @@ test.describe.serial("Test RBAC", () => {
 
       // rhdh-qe-sub-child-team owns mock-sub-child-site, check that it can see it's own groups' components
       const testSubChildGroup = "rhdh-qe-sub-child-team";
-      await page.goto("/catalog");
+      await uiHelper.goToPageUrl("/catalog");
       await uiHelper.selectMuiBox("Kind", "Component");
 
       await uiHelper.searchInputPlaceholder("mock-sub-child-site");
@@ -206,13 +213,12 @@ test.describe.serial("Test RBAC", () => {
   });
 
   test.describe("Test RBAC plugin as an admin user", () => {
-    // TODO: fix https://issues.redhat.com/browse/RHIDP-6625 and remove the skip
-    test.skip(() => process.env.IS_OPENSHIFT.includes("false"));
     test.beforeEach(async ({ page }, testInfo) => {
       testInfo.setTimeout(testInfo.timeout + 30_000); // Additional time due to repeated timeout failure in OSD env.
       const common = new Common(page);
       await common.loginAsKeycloakUser();
-      await page.goto("/rbac");
+      const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/rbac");
       await common.waitForLoad();
       await new UIhelper(page).verifyHeading("RBAC", 30_000);
     });
@@ -228,26 +234,33 @@ test.describe.serial("Test RBAC", () => {
       await uiHelper.verifyCellsInTable(allCellsIdentifier);
     });
 
-    test("Should download the user list", async ({ page }) => {
-      await page.locator('a:has-text("Download User List")').click();
-      const fileContent = await downloadAndReadFile(
-        page,
-        'a:has-text("Download User List")',
-      );
+    test("Should export CSV of the user list", async ({ page }) => {
+      const exportCsvLink = page.getByRole("link", { name: "Export CSV" });
+      await exportCsvLink.click();
+      const fileContent = await downloadAndReadFile(page, exportCsvLink);
+      await test.info().attach("user-list-file", {
+        body: fileContent,
+        contentType: "text/plain",
+      });
       const lines = fileContent.trim().split("\n");
 
       const header = "userEntityRef,displayName,email,lastAuthTime";
-      if (lines[0] !== header) {
-        throw new Error("Header does not match");
-      }
+      expect(lines[0], "Header needs to match the expected header").toBe(
+        header,
+      );
 
-      // Check that each subsequent line starts with "user:default"
-      const allUsersValid = lines
+      // Check that each subsequent line starts with "user:default" or "user:development"
+      const invalidLines = lines
         .slice(1)
-        .every((line) => line.startsWith("user:default"));
-      if (!allUsersValid) {
-        throw new Error("Not all users info are valid");
-      }
+        .filter(
+          (line) =>
+            !line.startsWith("user:default") &&
+            !line.startsWith("user:development"),
+        );
+
+      await test.step(`Validate user lines: ${invalidLines.length} invalid out of ${lines.length} total`, async () => {
+        expect(invalidLines, "All users should be valid").toHaveLength(0);
+      });
     });
 
     test("View details of a role", async ({ page }) => {
@@ -267,7 +280,7 @@ test.describe.serial("Test RBAC", () => {
         Roles.getUsersAndGroupsListCellsIdentifier();
       await uiHelper.verifyCellsInTable(usersAndGroupsCellsIdentifier);
 
-      await uiHelper.verifyHeading("Permission policies (5)");
+      await uiHelper.verifyHeading("5 permissions");
       const permissionPoliciesColumnsText =
         Roles.getPermissionPoliciesListColumnsText();
       await uiHelper.verifyColumnHeading(permissionPoliciesColumnsText);
@@ -371,7 +384,9 @@ test.describe.serial("Test RBAC", () => {
       await uiHelper.verifyHeading("role:default/test-role1");
       await uiHelper.clickTab("Overview");
 
-      await page.click(ROLE_OVERVIEW_COMPONENTS.updateMembers);
+      await page
+        .getByTestId(ROLE_OVERVIEW_COMPONENTS_TEST_ID.updateMembers)
+        .click();
       await uiHelper.verifyHeading("Edit Role");
       await uiHelper.fillTextInputByLabel(
         "Select users and groups",
@@ -388,7 +403,9 @@ test.describe.serial("Test RBAC", () => {
         nextButton2 = page.locator('[data-testid="nextButton-2"]');
         matchNextButton2 = await nextButton2.all();
         attempts++;
+        // eslint-disable-next-line playwright/no-conditional-in-test
       } while (matchNextButton2.length > 1 && attempts < 5);
+      // eslint-disable-next-line playwright/no-force-option
       await nextButton2.click({ force: true });
       await page.waitForTimeout(1_000);
       await uiHelper.clickButton("Save");
@@ -397,7 +414,9 @@ test.describe.serial("Test RBAC", () => {
       );
       await uiHelper.verifyHeading(rbacPo.regexpShortUsersAndGroups(1, 1));
 
-      await page.click(ROLE_OVERVIEW_COMPONENTS.updatePolicies);
+      await page
+        .getByTestId(ROLE_OVERVIEW_COMPONENTS_TEST_ID.updatePolicies)
+        .click();
       await uiHelper.verifyHeading("Edit Role");
       await rbacPo.selectPluginsCombobox.click();
       await rbacPo.selectOption("scaffolder");
@@ -409,7 +428,7 @@ test.describe.serial("Test RBAC", () => {
       await uiHelper.verifyText(
         "Role role:default/test-role1 updated successfully",
       );
-      await uiHelper.verifyHeading("Permission Policies (2)");
+      await uiHelper.verifyHeading("2 permissions");
 
       await rbacPo.deleteRole("role:default/test-role1");
     });
@@ -417,13 +436,18 @@ test.describe.serial("Test RBAC", () => {
     test("Create a role with a permission policy per resource type and verify that the only authorized users can access specific resources.", async ({
       page,
     }) => {
+      // TODO: https://issues.redhat.com/browse/RHDHBUGS-2127
+      test.fixme(true, "Cannot delete role because of missing permissions");
+
       const uiHelper = new UIhelper(page);
       const rbacPo = new RbacPo(page);
       await rbacPo.createConditionalRole(
         "test-role1",
-        ["Guest User", "rhdh-qe"],
+        ["Guest User", "rhdh-qe rhdh-qe"],
         ["Backstage"],
         "anyOf",
+        "catalog",
+        "user:default/rhdh-qe",
       );
 
       await page
@@ -449,7 +473,7 @@ test.describe.serial("Test RBAC", () => {
       const uiHelper = new UIhelper(page);
       await uiHelper.openSidebarButton("Administration");
       const dropdownMenuLocator = page.locator(`text="RBAC"`);
-      await expect(dropdownMenuLocator).not.toBeVisible();
+      await expect(dropdownMenuLocator).toBeHidden();
     });
   });
 
@@ -470,41 +494,46 @@ test.describe.serial("Test RBAC", () => {
       apiToken = await RhdhAuthApiHack.getToken(page);
     });
 
-    // eslint-disable-next-line no-empty-pattern
     test.beforeEach(async ({}, testInfo) => {
       console.log(
         `beforeEach: Attempting setup for ${testInfo.title}, retry: ${testInfo.retry}`,
       );
     });
 
-    test("Test that roles and policies from GET request are what expected", async () => {
-      const rbacApi = await RhdhRbacApi.build(apiToken);
+    // TODO: https://issues.redhat.com/browse/RHDHBUGS-2100
+    test.fixme(
+      "Test that roles and policies from GET request are what expected",
+      async () => {
+        const rbacApi = await RhdhRbacApi.build(apiToken);
 
-      const rolesResponse = await rbacApi.getRoles();
+        const rolesResponse = await rbacApi.getRoles();
 
-      const policiesResponse = await rbacApi.getPolicies();
+        const policiesResponse = await rbacApi.getPolicies();
 
-      if (!rolesResponse.ok()) {
-        throw Error(
-          `RBAC rolesResponse API call failed with status code ${rolesResponse.status()}`,
+        // eslint-disable-next-line playwright/no-conditional-in-test
+        if (!rolesResponse.ok()) {
+          throw Error(
+            `RBAC rolesResponse API call failed with status code ${rolesResponse.status()}`,
+          );
+        }
+
+        // eslint-disable-next-line playwright/no-conditional-in-test
+        if (!policiesResponse.ok()) {
+          throw Error(
+            `RBAC policiesResponse API call failed with status code ${policiesResponse.status()}`,
+          );
+        }
+
+        await Response.checkResponse(
+          rolesResponse,
+          RbacConstants.getExpectedRoles(),
         );
-      }
-
-      if (!policiesResponse.ok()) {
-        throw Error(
-          `RBAC policiesResponse API call failed with status code ${policiesResponse.status()}`,
+        await Response.checkResponse(
+          policiesResponse,
+          RbacConstants.getExpectedPolicies(),
         );
-      }
-
-      await Response.checkResponse(
-        rolesResponse,
-        RbacConstants.getExpectedRoles(),
-      );
-      await Response.checkResponse(
-        policiesResponse,
-        RbacConstants.getExpectedPolicies(),
-      );
-    });
+      },
+    );
 
     test("Create new role for rhdh-qe, change its name, and deny it from reading catalog entities", async () => {
       const rbacApi = await RhdhRbacApi.build(apiToken);
@@ -564,8 +593,8 @@ test.describe.serial("Test RBAC", () => {
       await page.reload();
       await uiHelper.openSidebar("Catalog");
       await uiHelper.clickButton("Self-service");
-      expect(await uiHelper.isLinkVisible("Register Existing Component"));
-      await uiHelper.clickButton("Register Existing Component");
+      await uiHelper.verifyLinkVisible("Import an existing Git repository");
+      await uiHelper.clickButton("Import an existing Git repository");
       const catalogImport = new CatalogImport(page);
       const component =
         "https://github.com/janus-qe/custom-catalog-entities/blob/main/timestamp-catalog-info.yaml";
@@ -651,7 +680,6 @@ test.describe.serial("Test RBAC", () => {
   });
 
   test.describe.serial("Test RBAC ownership conditional rule", () => {
-    // eslint-disable-next-line no-empty-pattern
     test.beforeEach(async ({}, testInfo) => {
       testInfo.setTimeout(testInfo.timeout + 30_000); // Additional time due to repeated timeout failure in OSD env.
     });
@@ -661,15 +689,15 @@ test.describe.serial("Test RBAC", () => {
     }) => {
       const common = new Common(page);
       await common.loginAsKeycloakUser();
-      await page.goto("/rbac");
+      const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/rbac");
       await common.waitForLoad();
       await new UIhelper(page).verifyHeading("RBAC", 30_000);
 
-      const uiHelper = new UIhelper(page);
       const rbacPo = new RbacPo(page);
       await rbacPo.createRBACConditionRole(
         "test-conditional-role",
-        [process.env.QE_USER6_ID],
+        [`${process.env.QE_USER6_ID} ${process.env.QE_USER6_ID}`],
         "user:default/rhdh-qe-6",
       );
 
@@ -690,11 +718,11 @@ test.describe.serial("Test RBAC", () => {
         process.env.QE_USER6_ID,
         process.env.QE_USER6_PASS,
       );
-      await page.goto("/rbac");
+      const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/rbac");
       await common.waitForLoad();
       await new UIhelper(page).verifyHeading("RBAC", 30_000);
 
-      const uiHelper = new UIhelper(page);
       const rbacPo = new RbacPo(page);
       const testUser = "Jonathon Page";
       await rbacPo.createRole(
@@ -737,7 +765,8 @@ test.describe.serial("Test RBAC", () => {
     test("Ensure that the admin can revoke access", async ({ page }) => {
       const common = new Common(page);
       await common.loginAsKeycloakUser();
-      await page.goto("/rbac");
+      const uiHelper = new UIhelper(page);
+      await uiHelper.goToPageUrl("/rbac");
       await common.waitForLoad();
       await new UIhelper(page).verifyHeading("RBAC", 30_000);
 
@@ -754,7 +783,64 @@ test.describe.serial("Test RBAC", () => {
       const uiHelper = new UIhelper(page);
       await uiHelper.openSidebarButton("Administration");
       const dropdownMenuLocator = page.locator(`text="RBAC"`);
-      await expect(dropdownMenuLocator).not.toBeVisible();
+      await expect(dropdownMenuLocator).toBeHidden();
+    });
+  });
+
+  test.describe
+    .serial("Test RBAC plugin: policyDecisionPrecedence: conditional — prioritize conditional before basic (default behavior)", () => {
+    test("should allow read as defined in basic policy and conditional", async ({
+      page,
+    }) => {
+      const common = new Common(page);
+      const uiHelper = new UIhelper(page);
+
+      // Should allow read for user7: has static allow read via CSV and is also permitted via conditional policy
+      await common.loginAsKeycloakUser(
+        process.env.QE_USER7_ID,
+        process.env.QE_USER7_PASS,
+      );
+      await uiHelper.openSidebar("Catalog");
+      await uiHelper.selectMuiBox("Kind", "Component");
+      await uiHelper.searchInputPlaceholder("mock-component");
+      await expect(
+        page.getByRole("link", { name: "mock-component-qe-7" }),
+      ).toBeVisible();
+    });
+
+    test("should allow read as defined in conditional policy, basic policy should be disregarded", async ({
+      page,
+    }) => {
+      const common = new Common(page);
+      const uiHelper = new UIhelper(page);
+
+      // Should allow read for user8: conditional policy takes precedence over static deny read via CSV
+      await common.loginAsKeycloakUser(
+        process.env.QE_USER8_ID,
+        process.env.QE_USER8_PASS,
+      );
+      await uiHelper.openSidebar("Catalog");
+      await uiHelper.selectMuiBox("Kind", "Component");
+      await uiHelper.searchInputPlaceholder("mock-component");
+      await expect(
+        page.getByRole("link", { name: "mock-component-qe-8" }),
+      ).toBeVisible();
+    });
+
+    test("should deny read as defined in conditional policy, basic policy should be disregarded", async ({
+      page,
+    }) => {
+      const common = new Common(page);
+      const uiHelper = new UIhelper(page);
+
+      // Should allow read for user9: conditional deny policy takes precedence over allow read via basic
+      await common.loginAsKeycloakUser(
+        process.env.QE_USER9_ID,
+        process.env.QE_USER9_PASS,
+      );
+      await uiHelper.openSidebar("Catalog");
+      await uiHelper.selectMuiBox("Kind", "Component");
+      await uiHelper.verifyTableIsEmpty();
     });
   });
 });

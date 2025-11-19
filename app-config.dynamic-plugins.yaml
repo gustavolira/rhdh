@@ -173,7 +173,7 @@ dynamicPlugins:
               gridColumn: 1 / -1
             if:
               anyOf:
-              - isAcrAvailable
+                - isAcrAvailable
     backstage-community.plugin-jfrog-artifactory:
       mountPoints:
         - mountPoint: entity.page.image-registry/cards
@@ -183,7 +183,7 @@ dynamicPlugins:
               gridColumn: 1 / -1
             if:
               anyOf:
-              - isJfrogArtifactoryAvailable
+                - isJfrogArtifactoryAvailable
     backstage-community.plugin-nexus-repository-manager:
       mountPoints:
         - mountPoint: entity.page.image-registry/cards
@@ -193,7 +193,7 @@ dynamicPlugins:
               gridColumn: 1 / -1
             if:
               anyOf:
-              - isNexusRepositoryManagerAvailable
+                - isNexusRepositoryManagerAvailable
     backstage-community.plugin-ocm:
       appIcons:
         - name: ocmIcon
@@ -217,8 +217,8 @@ dynamicPlugins:
                 xs: "span 12"
             if:
               allOf:
-              - isKind: resource
-              - isType: kubernetes-cluster
+                - isKind: resource
+                - isType: kubernetes-cluster
         - mountPoint: entity.page.overview/cards
           importName: ClusterInfoCard
           config:
@@ -229,8 +229,8 @@ dynamicPlugins:
                 xs: "span 12"
             if:
               allOf:
-              - isKind: resource
-              - isType: kubernetes-cluster
+                - isKind: resource
+                - isType: kubernetes-cluster
     backstage-community.plugin-quay:
       mountPoints:
         - mountPoint: entity.page.image-registry/cards
@@ -240,7 +240,7 @@ dynamicPlugins:
               gridColumn: 1 / -1
             if:
               anyOf:
-              - isQuayAvailable
+                - isQuayAvailable
     red-hat-developer-hub.backstage-plugin-bulk-import:
       appIcons:
         - name: bulkImportIcon
@@ -261,6 +261,10 @@ dynamicPlugins:
       mountPoints:
         - mountPoint: application/listener
           importName: DynamicGlobalFloatingActionButton
+    red-hat-developer-hub.backstage-plugin-quickstart:
+      mountPoints:
+        - mountPoint: application/provider
+          importName: QuickstartDrawerProvider
     red-hat-developer-hub.backstage-plugin-dynamic-home-page:
       dynamicRoutes:
         - path: /
@@ -272,32 +276,32 @@ dynamicPlugins:
           importName: SearchBar
           config:
             layouts:
-              xl: { w: 10, h: 1, x: 1 }
-              lg: { w: 10, h: 1, x: 1 }
-              md: { w: 10, h: 1, x: 1 }
-              sm: { w: 10, h: 1, x: 1 }
-              xs: { w: 12, h: 1 }
-              xxs: { w: 12, h: 1 }
+              xl: {w: 10, h: 1, x: 1}
+              lg: {w: 10, h: 1, x: 1}
+              md: {w: 10, h: 1, x: 1}
+              sm: {w: 10, h: 1, x: 1}
+              xs: {w: 12, h: 1}
+              xxs: {w: 12, h: 1}
         - mountPoint: home.page/cards
           importName: QuickAccessCard
           config:
             layouts:
-              xl: { w: 7, h: 8 }
-              lg: { w: 7, h: 8 }
-              md: { w: 7, h: 8 }
-              sm: { w: 12, h: 8 }
-              xs: { w: 12, h: 8 }
-              xxs: { w: 12, h: 8 }
+              xl: {w: 7, h: 8}
+              lg: {w: 7, h: 8}
+              md: {w: 7, h: 8}
+              sm: {w: 12, h: 8}
+              xs: {w: 12, h: 8}
+              xxs: {w: 12, h: 8}
         - mountPoint: home.page/cards
           importName: CatalogStarredEntitiesCard
           config:
             layouts:
-              xl: { w: 5, h: 4, x: 7 }
-              lg: { w: 5, h: 4, x: 7 }
-              md: { w: 5, h: 4, x: 7 }
-              sm: { w: 12, h: 4 }
-              xs: { w: 12, h: 4 }
-              xxs: { w: 12, h: 4 }
+              xl: {w: 5, h: 4, x: 7}
+              lg: {w: 5, h: 4, x: 7}
+              md: {w: 5, h: 4, x: 7}
+              sm: {w: 12, h: 4}
+              xs: {w: 12, h: 4}
+              xxs: {w: 12, h: 4}
     backstage-community.plugin-tekton:
       mountPoints:
         - mountPoint: entity.page.ci/cards
@@ -465,22 +469,22 @@ dynamicPlugins:
               width: 1500
               height: 800
     backstage-community.plugin-analytics-provider-segment:
-      apiFactories:
-        - importName: SegmentAnalyticsApi
+      analyticsApiExtensions:
+        - importName: SegmentAnalytics
     backstage-community.plugin-rbac:
-            appIcons:
-              - name: rbacIcon
-                importName: RbacIcon
-            dynamicRoutes:
-              - path: /rbac
-                importName: RbacPage
-                menuItem:
-                  icon: rbacIcon
-                  text: RBAC
-            menuItems:
-              rbac:
-                parent: admin
-                icon: rbacIcon
+      appIcons:
+        - name: rbacIcon
+          importName: RbacIcon
+      dynamicRoutes:
+        - path: /rbac
+          importName: RbacPage
+          menuItem:
+            icon: rbacIcon
+            text: RBAC
+      menuItems:
+        rbac:
+          parent: admin
+          icon: rbacIcon
     red-hat-developer-hub.backstage-plugin-marketplace:
       appIcons:
         - name: marketplace
@@ -494,3 +498,22 @@ dynamicPlugins:
           config:
             path: marketplace
             title: Catalog
+    red-hat-developer-hub.backstage-plugin-adoption-insights:
+      appIcons:
+        - name: adoptionInsightsIcon
+          importName: AdoptionInsightsIcon
+      dynamicRoutes:
+        - path: /adoption-insights
+          importName: AdoptionInsightsPage
+          menuItem:
+            icon: adoptionInsightsIcon
+            text: Adoption Insights
+      menuItems:
+        adoption-insights:
+          parent: admin
+          icon: adoptionInsightsIcon
+    red-hat-developer-hub.backstage-plugin-analytics-module-adoption-insights:
+      analyticsApiExtensions:
+        - importName: AdoptionInsightsAnalyticsApi
+app:
+  title: Red Hat Developer Hub

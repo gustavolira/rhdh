@@ -1,4 +1,5 @@
 import { Entity } from '@backstage/catalog-model';
+import { TranslationRef } from '@backstage/core-plugin-api/alpha';
 
 export type RouteBinding = {
   bindTarget: string;
@@ -23,6 +24,7 @@ export type ResolvedDynamicRouteMenuItem =
 export type ResolvedMenuItem = {
   name: string;
   title: string;
+  titleKey?: string;
   icon?: string;
   children?: ResolvedMenuItem[];
   to?: string;
@@ -76,7 +78,7 @@ export type MountPoint = {
 
 export type EntityTabOverrides = Record<
   string,
-  { title: string; mountPoint: string; priority?: number }
+  { title: string; titleKey?: string; mountPoint: string; priority?: number }
 >;
 
 export type MountPoints = Record<string, MountPoint[]>;
@@ -112,6 +114,7 @@ export type DynamicRootConfig = {
   providerSettings: ProviderSetting[];
   scaffolderFieldExtensions: ScaffolderFieldExtension[];
   techdocsAddons: TechdocsAddon[];
+  translationRefs: TranslationRef[];
 };
 
 export type ComponentRegistry = {

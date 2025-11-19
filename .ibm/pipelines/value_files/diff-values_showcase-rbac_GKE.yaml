@@ -1,6 +1,6 @@
-# This file is for GKE installation only. 
+# This file is for GKE installation only.
 # It is applied by `helm upgrade` after the `values-showcase.yaml` is applied and only contains complementary differences for GKE.
-# Note, that it overwrites the whole key that is present in this file. 
+# Note, that it overwrites the whole key that is present in this file.
 #   e.g. global.dynamic.plugins key is completely overwritten by the content of this file.
 route:
   enabled: false
@@ -37,16 +37,16 @@ upstream:
         valueFrom:
           secretKeyRef:
             key: postgres-password
-            name: '{{ .Release.Name }}-postgresql'
+            name: "{{ .Release.Name }}-postgresql"
       # disable telemetry in CI
       - name: SEGMENT_TEST_MODE
-        value: 'true'
+        value: "true"
       - name: NODE_TLS_REJECT_UNAUTHORIZED
-        value: '0'
+        value: "0"
       - name: NODE_ENV
-        value: 'production'
+        value: "production"
       - name: ENABLE_CORE_ROOTHTTPROUTER_OVERRIDE
-        value: 'true'
+        value: "true"
     extraVolumeMounts:
       # The initContainer below will install dynamic plugins in this volume mount.
       - name: dynamic-plugins-root
@@ -60,19 +60,14 @@ upstream:
       # To have more control on underlying storage, the [emptyDir](https://docs.openshift.com/container-platform/4.13/storage/understanding-ephemeral-storage.html)
       # could be changed to a [generic ephemeral volume](https://docs.openshift.com/container-platform/4.13/storage/generic-ephemeral-vols.html#generic-ephemeral-vols-procedure_generic-ephemeral-volumes).
       - name: dynamic-plugins-root
-        emptyDir: {}
-      - name: rbac-policy
-        configMap:
-          defaultMode: 420
-          name: rbac-policy
-      - name: rbac-conditions
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 5Gi
       # Volume that will expose the `dynamic-plugins.yaml` file from the `dynamic-plugins` config map.
       # The `dynamic-plugins` config map is created by the helm chart from the content of the `global.dynamic` field.
       - name: dynamic-plugins
         configMap:
           defaultMode: 420
-          name: dynamic-plugins
+          name: '{{ printf "%s-dynamic-plugins" .Release.Name }}'
           optional: true
       # Optional volume that allows exposing the `.npmrc` file (through a `dynamic-plugins-npmrc` secret)
       # to be used when running `npm pack` during the dynamic plugins installation by the initContainer.
@@ -80,7 +75,18 @@ upstream:
         secret:
           defaultMode: 420
           optional: true
-          secretName: dynamic-plugins-npmrc
+          secretName: '{{ printf "%s-dynamic-plugins-npmrc" .Release.Name }}'
+      - name: dynamic-plugins-registry-auth
+        secret:
+          defaultMode: 416
+          optional: true
+          secretName: '{{ printf "%s-dynamic-plugins-registry-auth" .Release.Name }}'
+      - name: rbac-policy
+        configMap:
+          defaultMode: 420
+          name: rbac-policy
+      - name: rbac-conditions
+        emptyDir: {}
     extraEnvVarsSecrets:
       - rhdh-secrets
     podSecurityContext:
@@ -116,17 +122,18 @@ upstream:
           valueFrom:
             secretKeyRef:
               key: postgres-password
-              name: '{{ .Release.Name }}-postgresql'
+              name: "{{ .Release.Name }}-postgresql"
   volumePermissions:
     enabled: true
   service:
     type: NodePort
   ingress:
     enabled: true
-    host: ''
+    host: ""
     annotations:
       kubernetes.io/ingress.class: gce
       kubernetes.io/ingress.global-static-ip-name: rhdh-static-ip
       ingress.gcp.kubernetes.io/pre-shared-cert: ""
       networking.gke.io/v1beta1.FrontendConfig: rhdh-gke-ingress-security-config
     className: gce
+orchestrator: null

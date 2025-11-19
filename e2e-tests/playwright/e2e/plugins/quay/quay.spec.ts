@@ -7,13 +7,20 @@ test.describe("Test Quay.io plugin", () => {
   const quayRepository = "rhdh-community/rhdh";
   let uiHelper: UIhelper;
 
+  test.beforeAll(async () => {
+    test.info().annotations.push({
+      type: "component",
+      description: "plugins",
+    });
+  });
+
   test.beforeEach(async ({ page }) => {
     const common = new Common(page);
     await common.loginAsGuest();
 
     uiHelper = new UIhelper(page);
     await uiHelper.openCatalogSidebar("Component");
-    await uiHelper.clickLink("Backstage Showcase");
+    await uiHelper.clickLink("Red Hat Developer Hub");
     await uiHelper.clickTab("Image Registry");
   });
 

@@ -9,7 +9,9 @@ p, role:xyz/team_a, catalog-entity, read, allow
 p, role:xyz/team_a, catalog.entity.create, create, allow
 p, role:xyz/team_a, catalog.location.create, create, allow
 p, role:xyz/team_a, catalog.location.read, read, allow
+p, role:default/team_a, scorecard.metric.read, read, allow
 
+g, user:default/rhdh-qe, role:default/team_a
 g, user:default/rhdh-qe, role:default/qe_rbac_admin
 p, role:default/qe_rbac_admin, kubernetes.proxy, use, allow
 p, role:default/qe_rbac_admin, kubernetes.resources.read, read, allow
@@ -33,3 +35,21 @@ p, role:default/kubernetes_reader, kubernetes.clusters.read, read, allow
 g, user:default/rhdh-qe-5, role:default/catalog_reader
 g, user:default/rhdh-qe-6, role:default/catalog_reader
 p, role:default/catalog_reader, catalog.entity.read, read, allow
+
+g, user:default/rhdh-qe, role:default/extension
+p, role:default/extension, extension-plugin, read, allow
+p, role:default/extension, extension-plugin, create, allow
+
+p, role:default/all_resource_reader, catalog-entity, read, allow
+p, role:default/all_resource_reader, catalog-entity, create, allow
+g, user:default/rhdh-qe-7, role:default/all_resource_reader
+
+p, role:default/all_resource_denier, catalog-entity, read, deny
+p, role:default/all_resource_denier, catalog-entity, create, allow
+g, user:default/rhdh-qe-8, role:default/all_resource_denier
+
+g, user:default/rhdh-qe-7, role:default/owned_resource_reader
+g, user:default/rhdh-qe-8, role:default/owned_resource_reader
+
+g, user:default/rhdh-qe-9, role:default/all_resource_reader
+g, user:default/rhdh-qe-9, role:default/conditional_denier

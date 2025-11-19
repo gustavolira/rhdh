@@ -7,6 +7,7 @@ The dynamic plugin support is based on the [backend plugin manager package](http
 Dynamic plugin support is based on Dynamic plugin derived packages.
 This is a special JavaScript package that is derived from an original plugin package source code.
 You can find more information about process of creating derived packages in the [Export Derived Dynamic Plugin Package](export-derived-package.md) document.
+<!-- markdown-link-check-disable-next-line -->
 The dynamic plugin derived packages shouldn't be pushed into the [public npm registry](https://www.npmjs.com), but it can be published to a private or internal npm registry.
 More details about publishing dynamic plugins is in the [Packaging Dynamic Plugins](packaging-dynamic-plugins.md) document.
 
@@ -54,7 +55,7 @@ Example of this process on the [todo](https://github.com/backstage/community-plu
 
     ```console
     $ cd plugins/todo-backend
-    $ npx @janus-idp/cli@latest package export-dynamic-plugin
+    $ npx @red-hat-developer-hub/cli@latest plugin export
     Building main package
       executing     yarn build ✔
     Packing main package to dist-dynamic/package.json
@@ -80,7 +81,7 @@ Example of this process on the [todo](https://github.com/backstage/community-plu
 
     ```console
     $ cd ../todo
-    $ npx @janus-idp/cli@latest package export-dynamic-plugin
+    $ npx @red-hat-developer-hub/cli@latest plugin export
     No scalprum config. Using default dynamic UI configuration:
     {
       "name": "backstage-community.plugin-todo",
@@ -107,7 +108,7 @@ Example of this process on the [todo](https://github.com/backstage/community-plu
     ```console
     $ cd ../..
     $ #we should be in workspaces/todo
-    $ npx @janus-idp/cli@latest package package-dynamic-plugins --tag quay.io/user/backstage-community-plugin-todo:v0.1.1
+    $ npx @red-hat-developer-hub/cli@latest plugin package --tag quay.io/user/backstage-community-plugin-todo:v0.1.1
       executing     podman --version ✔
     Using existing 'dist-dynamic' directory at plugins/todo
     Using existing 'dist-dynamic' directory at plugins/todo-backend

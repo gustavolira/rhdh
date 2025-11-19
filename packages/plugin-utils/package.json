@@ -16,9 +16,10 @@
     "pluginId": "plugin-utils",
     "pluginPackage": "@janus-idp/plugin-utils",
     "pluginPackages": [
-      "@janus-idp/plugin-utils"
+      "@red-hat-developer-hub/plugin-utils"
     ]
   },
+  "sideEffects": false,
   "scripts": {
     "build": "backstage-cli package build",
     "clean": "backstage-cli package clean",
@@ -30,21 +31,22 @@
     "prettier:fix": "prettier --ignore-unknown --write ."
   },
   "dependencies": {
-    "@backstage/catalog-model": "1.7.4"
+    "@backstage/catalog-model": "1.7.5",
+    "@backstage/core-plugin-api": "1.10.9"
   },
   "devDependencies": {
-    "@backstage/cli": "0.32.1",
-    "@backstage/test-utils": "1.7.8",
+    "@backstage/cli": "0.34.1",
+    "@backstage/test-utils": "1.7.11",
     "@testing-library/dom": "9.3.4",
-    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "14.3.1",
     "@testing-library/react-hooks": "8.0.1",
-    "@types/node": "22.15.22",
-    "@types/react": "18.3.23",
+    "@types/node": "22.19.1",
+    "@types/react": "18.3.26",
     "@types/react-dom": "18.3.7",
-    "prettier": "3.5.3",
+    "prettier": "3.6.2",
     "react": "18.3.1",
-    "typescript": "5.8.3"
+    "typescript": "5.9.3"
   },
   "browserslist": {
     "production": [

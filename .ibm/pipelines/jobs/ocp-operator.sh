@@ -18,6 +18,8 @@ initiate_operator_deployments() {
   oc apply -f /tmp/configmap-dynamic-plugins.yaml -n "${NAME_SPACE}"
   deploy_redis_cache "${NAME_SPACE}"
   deploy_rhdh_operator "${NAME_SPACE}" "${DIR}/resources/rhdh-operator/rhdh-start.yaml"
+  enable_orchestrator_plugins_op "${NAME_SPACE}"
+  deploy_orchestrator_workflows_operator "${NAME_SPACE}"
 
   configure_namespace "${NAME_SPACE_RBAC}"
   create_conditional_policies_operator /tmp/conditional-policies.yaml
@@ -27,6 +29,51 @@ initiate_operator_deployments() {
   create_dynamic_plugins_config "${DIR}/value_files/${HELM_CHART_RBAC_VALUE_FILE_NAME}" "/tmp/configmap-dynamic-plugins-rbac.yaml"
   oc apply -f /tmp/configmap-dynamic-plugins-rbac.yaml -n "${NAME_SPACE_RBAC}"
   deploy_rhdh_operator "${NAME_SPACE_RBAC}" "${DIR}/resources/rhdh-operator/rhdh-start-rbac.yaml"
+  enable_orchestrator_plugins_op "${NAME_SPACE_RBAC}"
+  deploy_orchestrator_workflows_operator "${NAME_SPACE_RBAC}"
+}
+
+# OSD-GCP specific operator deployment that skips orchestrator workflows
+initiate_operator_deployments_osd_gcp() {
+  echo "Initiating Operator-backed deployments on OSD-GCP (orchestrator disabled)"
+
+  prepare_operator
+
+  configure_namespace "${NAME_SPACE}"
+  deploy_test_backstage_customization_provider "${NAME_SPACE}"
+  local rhdh_base_url="https://backstage-${RELEASE_NAME}-${NAME_SPACE}.${K8S_CLUSTER_ROUTER_BASE}"
+  apply_yaml_files "${DIR}" "${NAME_SPACE}" "${rhdh_base_url}"
+
+  # Merge base values with OSD-GCP diff file before creating dynamic plugins config
+  yq_merge_value_files "merge" "${DIR}/value_files/${HELM_CHART_VALUE_FILE_NAME}" "${DIR}/value_files/${HELM_CHART_OSD_GCP_DIFF_VALUE_FILE_NAME}" "/tmp/merged-values_showcase_OSD-GCP.yaml"
+  create_dynamic_plugins_config "/tmp/merged-values_showcase_OSD-GCP.yaml" "/tmp/configmap-dynamic-plugins.yaml"
+  mkdir -p "${ARTIFACT_DIR}/${NAME_SPACE}"
+  cp -a "/tmp/configmap-dynamic-plugins.yaml" "${ARTIFACT_DIR}/${NAME_SPACE}/"
+
+  oc apply -f /tmp/configmap-dynamic-plugins.yaml -n "${NAME_SPACE}"
+  deploy_redis_cache "${NAME_SPACE}"
+  deploy_rhdh_operator "${NAME_SPACE}" "${DIR}/resources/rhdh-operator/rhdh-start.yaml"
+
+  # Skip orchestrator plugins and workflows for OSD-GCP
+  echo "Skipping orchestrator plugins and workflows deployment on OSD-GCP environment"
+
+  configure_namespace "${NAME_SPACE_RBAC}"
+  create_conditional_policies_operator /tmp/conditional-policies.yaml
+  prepare_operator_app_config "${DIR}/resources/config_map/app-config-rhdh-rbac.yaml"
+  local rbac_rhdh_base_url="https://backstage-${RELEASE_NAME_RBAC}-${NAME_SPACE_RBAC}.${K8S_CLUSTER_ROUTER_BASE}"
+  apply_yaml_files "${DIR}" "${NAME_SPACE_RBAC}" "${rbac_rhdh_base_url}"
+
+  # Merge RBAC values with OSD-GCP diff file before creating dynamic plugins config
+  yq_merge_value_files "merge" "${DIR}/value_files/${HELM_CHART_RBAC_VALUE_FILE_NAME}" "${DIR}/value_files/${HELM_CHART_RBAC_OSD_GCP_DIFF_VALUE_FILE_NAME}" "/tmp/merged-values_showcase-rbac_OSD-GCP.yaml"
+  create_dynamic_plugins_config "/tmp/merged-values_showcase-rbac_OSD-GCP.yaml" "/tmp/configmap-dynamic-plugins-rbac.yaml"
+  mkdir -p "${ARTIFACT_DIR}/${NAME_SPACE_RBAC}"
+  cp -a "/tmp/configmap-dynamic-plugins-rbac.yaml" "${ARTIFACT_DIR}/${NAME_SPACE_RBAC}/"
+
+  oc apply -f /tmp/configmap-dynamic-plugins-rbac.yaml -n "${NAME_SPACE_RBAC}"
+  deploy_rhdh_operator "${NAME_SPACE_RBAC}" "${DIR}/resources/rhdh-operator/rhdh-start-rbac.yaml"
+
+  # Skip orchestrator plugins and workflows for OSD-GCP RBAC
+  echo "Skipping orchestrator plugins and workflows deployment on OSD-GCP RBAC environment"
 }
 
 run_operator_runtime_config_change_tests() {
@@ -34,9 +81,9 @@ run_operator_runtime_config_change_tests() {
   configure_namespace "${NAME_SPACE_RUNTIME}"
   local runtime_url="https://backstage-${RELEASE_NAME}-${NAME_SPACE_RUNTIME}.${K8S_CLUSTER_ROUTER_BASE}"
   sed -i "s|POSTGRES_USER:.*|POSTGRES_USER: $RDS_USER|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
-  sed -i "s|POSTGRES_PASSWORD:.*|POSTGRES_PASSWORD: $(echo -n $RDS_PASSWORD | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
-  sed -i "s|POSTGRES_HOST:.*|POSTGRES_HOST: $(echo -n $RDS_1_HOST | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
-  sed -i "s|RHDH_RUNTIME_URL:.*|RHDH_RUNTIME_URL: $(echo -n $runtime_url | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
+  sed -i "s|POSTGRES_PASSWORD:.*|POSTGRES_PASSWORD: $(echo -n "$RDS_PASSWORD" | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
+  sed -i "s|POSTGRES_HOST:.*|POSTGRES_HOST: $(echo -n "$RDS_1_HOST" | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
+  sed -i "s|RHDH_RUNTIME_URL:.*|RHDH_RUNTIME_URL: $(echo -n "$runtime_url" | base64 -w 0)|g" "${DIR}/resources/postgres-db/postgres-cred.yaml"
   oc apply -f "$DIR/resources/postgres-db/postgres-crt-rds.yaml" -n "${NAME_SPACE_RUNTIME}"
   oc apply -f "$DIR/resources/postgres-db/postgres-cred.yaml" -n "${NAME_SPACE_RUNTIME}"
   oc apply -f "$DIR/resources/postgres-db/dynamic-plugins-root-PVC.yaml" -n "${NAME_SPACE_RUNTIME}"
@@ -49,12 +96,21 @@ run_operator_runtime_config_change_tests() {
 handle_ocp_operator() {
   oc_login
 
-  export K8S_CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+  K8S_CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+  export K8S_CLUSTER_ROUTER_BASE
   local url="https://backstage-${RELEASE_NAME}-${NAME_SPACE}.${K8S_CLUSTER_ROUTER_BASE}"
   local rbac_url="https://backstage-${RELEASE_NAME_RBAC}-${NAME_SPACE_RBAC}.${K8S_CLUSTER_ROUTER_BASE}"
 
   cluster_setup_ocp_operator
-  initiate_operator_deployments
+
+  # Use OSD-GCP specific deployment for osd-gcp jobs (orchestrator disabled)
+  if [[ "${JOB_NAME}" =~ osd-gcp ]]; then
+    echo "Detected OSD-GCP operator job, using OSD-GCP specific deployment (orchestrator disabled)"
+    initiate_operator_deployments_osd_gcp
+  else
+    initiate_operator_deployments
+  fi
+
   check_and_test "${RELEASE_NAME}" "${NAME_SPACE}" "${url}"
   check_and_test "${RELEASE_NAME_RBAC}" "${NAME_SPACE_RBAC}" "${rbac_url}"
 

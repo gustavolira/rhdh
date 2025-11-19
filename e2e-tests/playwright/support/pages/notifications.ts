@@ -12,21 +12,20 @@ export class NotificationPage {
 
   async clickNotificationsNavBarItem() {
     await this.uiHelper.openSidebar("Notifications");
+    await expect(
+      this.page.getByTestId("loading-indicator").getByRole("img"),
+    ).toHaveCount(0);
   }
 
-  async notificationContains(text: string | RegExp, nth = 0) {
+  async notificationContains(text: string | RegExp) {
     await this.page.getByLabel(/.*rows/).click();
     // always expand the notifications table to show as many notifications as possible
     await this.page.getByRole("option", { name: "20" }).click();
     await expect(
       this.page.getByTestId("loading-indicator").getByRole("img"),
     ).toHaveCount(0);
-    const row = await this.page.locator(`tr`, { hasText: text }).first();
+    const row = this.page.locator(`tr`, { hasText: text }).first();
     await expect(row).toHaveCount(1);
-  }
-
-  async notificationTextExists(text: string | RegExp) {
-    await expect(this.page.getByRole("cell", { name: text })).toHaveCount(1);
   }
 
   async clickNotificationHeadingLink(text: string | RegExp) {
@@ -72,7 +71,7 @@ export class NotificationPage {
     ).toHaveCount(0);
   }
 
-  async saveSelected(nth = 1) {
+  async saveSelected() {
     await this.page
       .locator("thead")
       .getByTitle("Save selected for later")
@@ -103,29 +102,25 @@ export class NotificationPage {
   }
 
   async markLastNotificationAsRead() {
-    const row = await this.page.locator("td:nth-child(3) > div").first();
+    const row = this.page.locator("td:nth-child(3) > div").first();
     await row.getByRole("button").nth(1).click();
   }
 
   async markNotificationAsRead(text: string) {
-    const row = await this.page.locator(`tr:has-text("${text}")`);
+    const row = this.page.locator(`tr:has-text("${text}")`);
     await row.getByRole("button").nth(1).click();
   }
 
   async markLastNotificationAsUnRead() {
-    const row = await this.page.locator("td:nth-child(3) > div").first();
+    const row = this.page.locator("td:nth-child(3) > div").first();
     await row.getByRole("button").nth(1).click();
   }
 
   async viewRead() {
     await this.page.getByLabel("View").click();
-    if (`${process.env.MILESTONE}` == "5") {
-      await this.page
-        .getByRole("option", { name: "Read notifications", exact: true })
-        .click();
-    } else {
-      await this.page.getByRole("option", { name: "Marked as read" }).click();
-    }
+    await this.page
+      .getByRole("option", { name: "Read notifications", exact: true })
+      .click();
     await expect(
       this.page.getByTestId("loading-indicator").getByRole("img"),
     ).toHaveCount(0);
@@ -133,13 +128,9 @@ export class NotificationPage {
 
   async viewUnRead() {
     await this.page.getByLabel("View").click();
-    if (`${process.env.MILESTONE}` == "5") {
-      await this.page
-        .getByRole("option", { name: "Unread notifications", exact: true })
-        .click();
-    } else {
-      await this.page.getByRole("option", { name: "New only" }).click();
-    }
+    await this.page
+      .getByRole("option", { name: "Unread notifications", exact: true })
+      .click();
     await expect(
       this.page.getByTestId("loading-indicator").getByRole("img"),
     ).toHaveCount(0);

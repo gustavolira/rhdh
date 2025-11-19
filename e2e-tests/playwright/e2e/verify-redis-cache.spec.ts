@@ -5,6 +5,13 @@ import Redis from "ioredis";
 import { ChildProcessWithoutNullStreams, exec, spawn } from "child_process";
 
 test.describe("Verify Redis Cache DB", () => {
+  test.beforeAll(async () => {
+    test.info().annotations.push({
+      type: "component",
+      description: "core",
+    });
+  });
+
   test.describe.configure({ mode: "serial" });
   let common: Common;
   let uiHelper: UIhelper;
@@ -49,7 +56,7 @@ test.describe("Verify Redis Cache DB", () => {
 
     await uiHelper.openSidebarButton("Favorites");
     await uiHelper.openSidebar("Docs");
-    await uiHelper.clickLink("Backstage Showcase");
+    await uiHelper.clickLink("Red Hat Developer Hub");
 
     // ensure that the docs are generated. if redis configuration has an error, this page will hang and docs won't be generated
     await expect(async () => {

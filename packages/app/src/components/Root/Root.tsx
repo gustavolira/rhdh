@@ -18,13 +18,15 @@ import {
   SidebarSpace,
 } from '@backstage/core-components';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
+import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { MyGroupsSidebarItem } from '@backstage/plugin-org';
 import { usePermission } from '@backstage/plugin-permission-react';
 import { SidebarSearchModal } from '@backstage/plugin-search';
+import { searchTranslationRef } from '@backstage/plugin-search/alpha';
 import { Settings as SidebarSettings } from '@backstage/plugin-user-settings';
+import { userSettingsTranslationRef } from '@backstage/plugin-user-settings/alpha';
 
 import { policyEntityCreatePermission } from '@backstage-community/plugin-rbac-common';
-import { AdminIcon } from '@internal/plugin-dynamic-plugins-info';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -34,12 +36,16 @@ import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
-import { styled, SxProps } from '@mui/material/styles';
+import { styled, SxProps, Theme } from '@mui/material/styles';
+import { ThemeConfig } from '@red-hat-developer-hub/backstage-plugin-theme';
 import DynamicRootContext, {
   ResolvedMenuItem,
 } from '@red-hat-developer-hub/plugin-utils';
 
+import { useLanguagePreference } from '../../hooks/useLanguagePreference';
+import { useTranslation } from '../../hooks/useTranslation';
 import { ApplicationHeaders } from './ApplicationHeaders';
+import { CustomSidebarItem } from './CustomSidebarItem';
 import { MenuIcon } from './MenuIcon';
 import { SidebarLogo } from './SidebarLogo';
 
@@ -47,6 +53,8 @@ import { SidebarLogo } from './SidebarLogo';
  * This is a workaround to remove the fix height of the Page component
  * to support the application headers (and the global header plugin)
  * without having multiple scrollbars.
+ *
+ * Note that we cannot target class names directly, due to obfuscation in production builds.
  *
  * This solves also the duplicate scrollbar issues in tech docs:
  * https://issues.redhat.com/browse/RHIDP-4637 (Scrollbar for docs behaves weirdly if there are over a page of headings)
@@ -79,6 +87,7 @@ import { SidebarLogo } from './SidebarLogo';
  * </body>
  * ```
  */
+// this component is copied to rhdh-plugins/global-header packages/app/src/components/Root/Root.tsx and should be kept in sync
 const PageWithoutFixHeight = styled(Box, {
   name: 'RHDHPageWithoutFixHeight',
   slot: 'root',
@@ -98,19 +107,25 @@ const PageWithoutFixHeight = styled(Box, {
   },
 }));
 
+// this component is copied to rhdh-plugins/global-header packages/app/src/components/Root/Root.tsx and should be kept in sync
+interface SidebarLayoutProps {
+  aboveSidebarHeaderHeight?: number;
+  aboveMainContentHeaderHeight?: number;
+}
+
 const SidebarLayout = styled(Box, {
   name: 'RHDHPageWithoutFixHeight',
   slot: 'sidebarLayout',
   shouldForwardProp: prop =>
     prop !== 'aboveSidebarHeaderHeight' &&
     prop !== 'aboveMainContentHeaderHeight',
-})(
+})<SidebarLayoutProps>(
   ({
     aboveSidebarHeaderHeight,
     aboveMainContentHeaderHeight,
-  }: {
-    aboveSidebarHeaderHeight?: number;
-    aboveMainContentHeaderHeight?: number;
+    theme,
+  }: SidebarLayoutProps & {
+    theme?: Theme;
   }) => ({
     // We remove Backstage's 100vh on the content, and instead rely on flexbox
     // to take up the whole viewport.
@@ -118,7 +133,8 @@ const SidebarLayout = styled(Box, {
     flexGrow: 1,
     maxHeight: `calc(100vh - ${aboveSidebarHeaderHeight ?? 0}px)`,
 
-    '& div[class*="BackstageSidebarPage"]': {
+    // BackstageSidebarPage-root
+    '& > div': {
       display: 'flex',
       flexDirection: 'column',
       height: 'unset',
@@ -134,15 +150,24 @@ const SidebarLayout = styled(Box, {
       },
     },
 
-    // The height is controlled by the flexbox in the BackstageSidebarPage.
-    '& main[class*="BackstagePage-root"]': {
+    '& main': {
+      // The height is controlled by the flexbox in the BackstageSidebarPage.
       height: `calc(100vh - ${aboveSidebarHeaderHeight! + aboveMainContentHeaderHeight!}px)`,
       flexGrow: 1,
     },
 
-    // We need to compensate for the above-sidebar position of the global header
-    // as it takes up a fixed height at the top of the page.
-    '& div[class*="BackstageSidebar-drawer"]': {
+    // When quickstart drawer is open, adjust margin
+    '.quickstart-drawer-open &': {
+      '& main': {
+        marginRight: `calc(var(--quickstart-drawer-width, 500px) + ${(theme as ThemeConfig).palette?.rhdh?.general.pageInset})`,
+        transition: 'margin-right 0.3s ease',
+      },
+    },
+
+    // BackstageSidebarPage-root > nav > BackstageSidebar-root > BackstageSidebar-drawer
+    '& > div > nav > div > div': {
+      // We need to compensate for the above-sidebar position of the global header
+      // as it takes up a fixed height at the top of the page.
       top: `max(0px, ${aboveSidebarHeaderHeight ?? 0}px)`,
     },
   }),
@@ -170,25 +195,32 @@ const renderExpandIcon = (expand: boolean) => {
   );
 };
 
-const getMenuItem = (menuItem: ResolvedMenuItem, isNestedMenuItem = false) => {
+const getMenuItem = (
+  menuItem: ResolvedMenuItem,
+  isNestedMenuItem = false,
+  getMenuText: (item: ResolvedMenuItem) => string,
+) => {
   const menuItemStyle = {
     paddingLeft: isNestedMenuItem ? '2rem' : '',
   };
+  const translatedText = getMenuText(menuItem);
   return menuItem.name === 'default.my-group' ? (
     <Box key={menuItem.name} sx={{ '& a': menuItemStyle }}>
       <MyGroupsSidebarItem
         key={menuItem.name}
         icon={renderIcon(menuItem.icon ?? '')}
-        singularTitle={menuItem.title}
-        pluralTitle={`${menuItem.title}s`}
+        // Plural localization will be address in
+        // https://issues.redhat.com/browse/RHDHBUGS-2077
+        singularTitle={translatedText}
+        pluralTitle={`${translatedText}s`}
       />
     </Box>
   ) : (
-    <SidebarItem
+    <CustomSidebarItem
       key={menuItem.name}
       icon={renderIcon(menuItem.icon ?? '')}
       to={menuItem.to ?? ''}
-      text={menuItem.title}
+      text={translatedText}
       style={menuItemStyle}
     />
   );
@@ -224,6 +256,9 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
   const aboveMainContentHeaderRef = useRef<HTMLDivElement>(null);
   const [aboveMainContentHeaderHeight, setAboveMainContentHeaderHeight] =
     useState(0);
+
+  const { t: searchT } = useTranslationRef(searchTranslationRef);
+  const { t: userSettingsT } = useTranslationRef(userSettingsTranslationRef);
 
   useLayoutEffect(() => {
     if (!aboveSidebarHeaderRef.current) return () => {};
@@ -277,6 +312,15 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
       permission: policyEntityCreatePermission,
       resourceRef: undefined,
     });
+  useLanguagePreference();
+  const { t } = useTranslation();
+
+  const getMenuText = (menuItem: ResolvedMenuItem) => {
+    if (menuItem.titleKey) {
+      return t(menuItem.titleKey as any, {});
+    }
+    return menuItem.title;
+  };
 
   const handleClick = (itemName: string) => {
     setOpenItems(prevOpenItems => ({
@@ -310,10 +354,10 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           },
         }}
         renderItem={child => (
-          <SidebarItem
+          <CustomSidebarItem
             key={child.title}
             icon={() => null}
-            text={child.title}
+            text={getMenuText(child)}
             to={child.to ?? ''}
           />
         )}
@@ -357,12 +401,12 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
               }}
             >
               {child.children && child.children.length === 0 ? (
-                getMenuItem(child, true)
+                getMenuItem(child, true, getMenuText)
               ) : (
                 <>
                   <SidebarItem
                     icon={renderIcon(child.icon ?? '')}
-                    text={child.title}
+                    text={getMenuText(child)}
                     onClick={() => handleClick(child.name)}
                   >
                     {child.children!.length > 0 &&
@@ -387,8 +431,8 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
       : menuItems.filter(mi => !mi.name.startsWith('default.'));
 
     menuItemArray = isBottomMenuSection
-      ? menuItemArray.filter(mi => mi.name === 'admin')
-      : menuItemArray.filter(mi => mi.name !== 'admin');
+      ? menuItemArray.filter(mi => mi.name.includes('admin'))
+      : menuItemArray.filter(mi => !mi.name.includes('admin'));
 
     if (isBottomMenuSection && !canDisplayRBACMenuItem && !loadingPermission) {
       menuItemArray[0].children = menuItemArray[0].children?.filter(
@@ -401,12 +445,13 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           const isOpen = openItems[menuItem.name] || false;
           return (
             <Fragment key={menuItem.name}>
-              {menuItem.children!.length === 0 && getMenuItem(menuItem)}
+              {menuItem.children!.length === 0 &&
+                getMenuItem(menuItem, false, getMenuText)}
               {menuItem.children!.length > 0 && (
                 <SidebarItem
                   key={menuItem.name}
                   icon={renderIcon(menuItem.icon ?? '')}
-                  text={menuItem.title}
+                  text={getMenuText(menuItem)}
                   onClick={() => handleClick(menuItem.name)}
                 >
                   {menuItem.children!.length > 0 && renderExpandIcon(isOpen)}
@@ -423,16 +468,17 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
 
   return (
     <PageWithoutFixHeight>
-      <div id="above-sidebar-header-container" ref={aboveSidebarHeaderRef}>
+      <div id="rhdh-above-sidebar-header-container" ref={aboveSidebarHeaderRef}>
         <ApplicationHeaders position="above-sidebar" />
       </div>
       <SidebarLayout
+        id="rhdh-sidebar-layout"
         aboveSidebarHeaderHeight={aboveSidebarHeaderHeight}
         aboveMainContentHeaderHeight={aboveMainContentHeaderHeight}
       >
         <SidebarPage>
           <div
-            id="above-main-content-header-container"
+            id="rhdh-above-main-content-header-container"
             ref={aboveMainContentHeaderRef}
           >
             <ApplicationHeaders position="above-main-content" />
@@ -441,7 +487,11 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
             {showLogo && <SidebarLogo />}
             {showSearch ? (
               <>
-                <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
+                <SidebarGroup
+                  label={searchT('sidebarSearchModal.title')}
+                  icon={<SearchIcon />}
+                  to="/search"
+                >
                   <SidebarSearchModal />
                 </SidebarGroup>
                 <SidebarDivider />
@@ -449,7 +499,7 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
             ) : (
               <Box sx={{ height: '1.2rem' }} />
             )}
-            <SidebarGroup label="Menu" icon={<MuiMenuIcon />}>
+            <SidebarGroup label={t('sidebar.menu')} icon={<MuiMenuIcon />}>
               {/* Global nav, not org-specific */}
               {renderMenuItems(true, false)}
               {/* End global nav */}
@@ -474,8 +524,8 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
             {showAdministration && (
               <>
                 <SidebarDivider />
-                <SidebarGroup label="Administration" icon={<AdminIcon />}>
-                  {renderMenuItems(false, true)}
+                <SidebarGroup label="Administration">
+                  {renderMenuItems(true, true)}
                 </SidebarGroup>
               </>
             )}
@@ -483,7 +533,7 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
               <>
                 <SidebarDivider />
                 <SidebarGroup
-                  label="Settings"
+                  label={userSettingsT('sidebarTitle')}
                   to="/settings"
                   icon={<AccountCircleOutlinedIcon />}
                 >

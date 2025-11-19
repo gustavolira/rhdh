@@ -1,12 +1,19 @@
 import { test } from "@playwright/test";
 import { Common } from "../../utils/common";
-import { FabPo } from "../../support/pageObjects/global-fab-po";
+import { FabPo } from "../../support/page-objects/global-fab-po";
 import { UIhelper } from "../../utils/ui-helper";
-import { PagesUrl } from "../../support/pageObjects/page";
+import { PagesUrl } from "../../support/page-objects/page";
 
 test.describe("Test global floating action button plugin", () => {
   let uiHelper: UIhelper;
   let fabHelper: FabPo;
+
+  test.beforeAll(async () => {
+    test.info().annotations.push({
+      type: "component",
+      description: "plugins",
+    });
+  });
 
   test.beforeEach(async ({ page }) => {
     const common = new Common(page);
@@ -21,7 +28,7 @@ test.describe("Test global floating action button plugin", () => {
     await fabHelper.verifyFabButtonByLabel("Git");
     await fabHelper.verifyFabButtonByDataTestId("bulk-import");
     await fabHelper.clickFabMenuByTestId("bulk-import");
-    await uiHelper.verifyText("Added repositories");
+    await uiHelper.verifyText("Imported entities");
   });
 
   test("Check if floating button is shown with two sub-menu actions on the Catalog Page, verify Git sub-menu", async () => {

@@ -4,9 +4,8 @@
 source "$DIR"/utils.sh
 
 install_rhdh_operator() {
-  local dir=$1
-  local namespace=$2
-  local max_attempts=$3
+  local namespace=$1
+  local max_attempts=$2
 
   configure_namespace "$namespace"
 
@@ -35,6 +34,10 @@ install_rhdh_operator() {
     done
   else
     local operator_version="${RELEASE_BRANCH_NAME#release-}"
+    if [[ -z "$operator_version" ]]; then
+      echo "Error: Failed to extract operator version from RELEASE_BRANCH_NAME: '$RELEASE_BRANCH_NAME'"
+      return 1
+    fi
     echo "Installing RHDH operator with '-v $operator_version' flag"
     for ((i = 1; i <= max_attempts; i++)); do
       if output=$(bash -x /tmp/install-rhdh-catalog-source.sh -v "$operator_version" --install-operator rhdh); then
@@ -53,7 +56,7 @@ install_rhdh_operator() {
 prepare_operator() {
   local retry_operator_installation="${1:-1}"
   configure_namespace "${OPERATOR_MANAGER}"
-  install_rhdh_operator "${DIR}" "${OPERATOR_MANAGER}" "$retry_operator_installation"
+  install_rhdh_operator "${OPERATOR_MANAGER}" "$retry_operator_installation"
 }
 
 wait_for_backstage_crd() {

@@ -1,7 +1,7 @@
 app:
   # Should be the same as backend.baseUrl when using the `app-backend` plugin.
   baseUrl: http://localhost:7007
-
+  title: Red Hat Developer Hub
 backend:
   # Required for authentication. This secret is shared by all backend plugins.
   # See https://backstage.io/docs/auth/service-to-service-auth for
@@ -19,7 +19,6 @@ backend:
   # all interfaces, the most permissive setting. The right value depends on your specific deployment.
   listen:
     port: 7007
-
   # config options: https://node-postgres.com/api/client
   database:
     client: pg

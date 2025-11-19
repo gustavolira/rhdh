@@ -2,18 +2,33 @@ import { test, expect } from "@playwright/test";
 import { KubeClient } from "../../utils/kube-client";
 import { Common } from "../../utils/common";
 import { UIhelper } from "../../utils/ui-helper";
-
 test.describe("Change app-config at e2e test runtime", () => {
+  test.beforeAll(async () => {
+    test.info().annotations.push(
+      {
+        type: "component",
+        description: "configuration",
+      },
+      {
+        type: "namespace",
+        description: process.env.NAME_SPACE_RUNTIME || "showcase-runtime",
+      },
+    );
+  });
+
   // operator nightly does not require this test as RDS tls test also verifies runtime change
   test.skip(() => process.env.JOB_NAME.includes("operator"));
-  
+
   test("Verify title change after ConfigMap modification", async ({ page }) => {
     test.setTimeout(300000); // Increasing to 5 minutes
 
     // Start with a common name, but let KubeClient find the actual ConfigMap
     const configMapName = "app-config-rhdh";
+    // eslint-disable-next-line playwright/no-conditional-in-test
     const namespace = process.env.NAME_SPACE_RUNTIME || "showcase-runtime";
-    const deploymentName = "rhdh-developer-hub";
+    const deploymentName =
+      // eslint-disable-next-line playwright/no-conditional-in-test
+      (process.env.RELEASE_NAME || "rhdh") + "-developer-hub";
 
     const kubeUtils = new KubeClient();
     const dynamicTitle = generateDynamicTitle();

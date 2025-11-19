@@ -14,7 +14,7 @@ export class Topology {
   async hoverOnPodStatusIndicator() {
     const locator = this.page
       .locator('[data-test-id="topology-test"]')
-      .getByText("1")
+      .getByText("1Pod")
       .first();
     await locator.hover();
     await this.page.waitForTimeout(1000);
@@ -24,7 +24,7 @@ export class Topology {
     await this.uiHelper.verifyHeading("Missing Permission");
     await this.uiHelper.verifyText("kubernetes.clusters.read");
     await this.uiHelper.verifyText("kubernetes.resources.read");
-    await expect(this.page.getByLabel("Pod")).not.toBeVisible();
+    await expect(this.page.getByLabel("Pod")).toBeHidden();
   }
 
   async verifyDeployment(name: string) {
@@ -46,9 +46,12 @@ export class Topology {
       .click();
 
     if (allowed) {
+      const downloadLogsButton = this.page.getByRole("button", {
+        name: "download logs",
+      });
       const fileContent = await downloadAndReadFile(
         this.page,
-        'role=button[name="download logs"]',
+        downloadLogsButton,
       );
       expect(fileContent).not.toBeUndefined();
       expect(fileContent).not.toBe("");
