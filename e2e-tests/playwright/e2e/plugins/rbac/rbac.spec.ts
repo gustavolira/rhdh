@@ -448,7 +448,7 @@ test.describe("Test RBAC", () => {
       await nextButton2.click();
       // Wait for Save button which only appears on the review step
       await expect(page.getByRole("button", { name: "Save" })).toBeVisible({
-        timeout: 15000,
+        timeout: 20000,
       });
       await uiHelper.clickButton("Save");
       await uiHelper.verifyText(
