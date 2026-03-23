@@ -63,6 +63,11 @@ export class ThemeVerifier {
       colorPrimary,
     );
     await this.uiHelper.openSidebar(t["rhdh"][lang]["menuItem.catalog"]);
+    // Wait for the Catalog page to fully load before checking CSS colors
+    await this.page.waitForLoadState("domcontentloaded");
+    await expect(
+      this.page.locator(UI_HELPER_ELEMENTS.MuiButtonTextPrimary).first(),
+    ).toBeVisible({ timeout: 15000 });
     await this.uiHelper.checkCssColor(
       this.page,
       UI_HELPER_ELEMENTS.MuiButtonTextPrimary,
