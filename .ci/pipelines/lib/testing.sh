@@ -203,6 +203,110 @@ testing::run_tests() {
   return "$test_result"
 }
 
+# Cluster-free plugin sanity check (RHIDP-13508): boots packages/backend from
+# source with every OCI plugin declared by the catalog index and verifies -
+# via /api/dynamic-plugins-info/loaded-plugins - that the product's dynamic
+# plugin loader loaded all of them. Runs entirely inside the test pod: no
+# cluster deployment and no product image (see
+# e2e-tests/playwright.plugin-sanity.config.ts).
+# Args:
+#   $1 - artifacts_subdir: (optional) Subdirectory for artifacts (defaults to plugin-dynamic-loading)
+testing::run_plugin_sanity_check() {
+  local artifacts_subdir="${1:-plugin-dynamic-loading}"
+
+  test_run_tracker::register "$artifacts_subdir"
+  test_run_tracker::mark_deploy_success
+  # Pessimistic default, same rationale as testing::run_tests.
+  test_run_tracker::mark_test_result "false" "${UNKNOWN_FAILURE_COUNT}"
+
+  # Branch-aware nightly index by default; overridable via Gangway
+  # (--catalog-index-image), e.g. for RC verification.
+  export CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-quay.io/rhdh/plugin-catalog-index:${RELEASE_VERSION}}"
+  log::info "Running cluster-free plugin sanity check against ${CATALOG_INDEX_IMAGE}"
+
+  local repo_root
+  repo_root="$(cd "${DIR}/../.." && pwd)"
+
+  # Booting packages/backend from source needs the ROOT workspace dependencies
+  # (e2e-tests has its own lockfile, installed separately below).
+  if ! (cd "${repo_root}" && yarn install --immutable > /tmp/yarn.install.root.log.txt 2>&1); then
+    log::error "=== ROOT YARN INSTALL FAILED ==="
+    cat /tmp/yarn.install.root.log.txt
+    save_overall_result 1
+    return 1
+  fi
+  log::success "Root yarn install completed successfully."
+
+  "${repo_root}/e2e-tests/local-harness/populate-catalog-index.sh" 2>&1 | tee "/tmp/${LOGFILE}-plugin-sanity-populate"
+  local populate_result=${PIPESTATUS[0]}
+  if [[ "${populate_result}" -ne 0 ]]; then
+    log::error "populate-catalog-index.sh failed (exit ${populate_result})"
+    save_overall_result 1
+    return 1
+  fi
+
+  cd "${repo_root}/e2e-tests" || return 1
+
+  if ! yarn install --immutable > /tmp/yarn.install.log.txt 2>&1; then
+    log::error "=== YARN INSTALL FAILED ==="
+    cat /tmp/yarn.install.log.txt
+    save_overall_result 1
+    return 1
+  fi
+
+  local junit_results="junit-results-plugin-sanity.xml"
+  (
+    set -e
+    JUNIT_RESULTS="${junit_results}" yarn plugin-sanity
+  ) 2>&1 | tee "/tmp/${LOGFILE}-plugin-sanity"
+  local test_result=${PIPESTATUS[0]}
+
+  common::save_artifact "${artifacts_subdir}" "${repo_root}/e2e-tests/${junit_results}" || true
+  if [[ "${CI}" == "true" && -f "${ARTIFACT_DIR}/${artifacts_subdir}/${junit_results}" ]]; then
+    # Gzip junit before writing to SHARED_DIR to stay under Kubernetes Secret 1 MiB limit
+    gzip -c "${ARTIFACT_DIR}/${artifacts_subdir}/${junit_results}" > "${SHARED_DIR}/junit-results-${artifacts_subdir}.xml.gz"
+    local gz_size
+    gz_size=$(stat -c%s "${SHARED_DIR}/junit-results-${artifacts_subdir}.xml.gz" 2> /dev/null || stat -f%z "${SHARED_DIR}/junit-results-${artifacts_subdir}.xml.gz")
+    local max_size=$((800 * 1024))
+    if ((gz_size > max_size)); then
+      echo "[WARNING] junit-results-${artifacts_subdir}.xml.gz is $((gz_size / 1024)) KB, exceeds $((max_size / 1024)) KB limit. Removing from SHARED_DIR."
+      rm -f "${SHARED_DIR}/junit-results-${artifacts_subdir}.xml.gz"
+    else
+      echo "[INFO] Copied junit-results-${artifacts_subdir}.xml.gz to SHARED_DIR ($((gz_size / 1024)) KB)"
+    fi
+  fi
+
+  ansi2html < "/tmp/${LOGFILE}-plugin-sanity" > "/tmp/${LOGFILE}-plugin-sanity.html"
+  common::save_artifact "${artifacts_subdir}" "/tmp/${LOGFILE}-plugin-sanity.html" || true
+  common::save_artifact "${artifacts_subdir}" "${repo_root}/e2e-tests/playwright-report-plugin-sanity/" || true
+
+  echo "Cluster-free plugin sanity check (artifacts: ${artifacts_subdir}) RESULT: ${test_result}"
+  local test_passed="true"
+  if [[ "${test_result}" -ne 0 ]]; then
+    save_overall_result 1
+    test_passed="false"
+  fi
+  local failed_tests="0"
+  if [[ "${test_result}" -ne 0 ]]; then
+    if [[ -f "${repo_root}/e2e-tests/${junit_results}" ]]; then
+      local _junit_failures _junit_errors
+      _junit_failures=$(grep -oP 'failures="\K[0-9]+' "${repo_root}/e2e-tests/${junit_results}" | head -n 1)
+      _junit_errors=$(grep -oP 'errors="\K[0-9]+' "${repo_root}/e2e-tests/${junit_results}" | head -n 1)
+      _junit_failures="${_junit_failures:-0}"
+      _junit_errors="${_junit_errors:-0}"
+      failed_tests=$((_junit_failures + _junit_errors))
+      if [[ "${failed_tests}" -eq 0 ]]; then
+        failed_tests="${UNKNOWN_FAILURE_COUNT}"
+      fi
+    else
+      failed_tests="${UNKNOWN_FAILURE_COUNT}"
+    fi
+    echo "Number of failed tests: ${failed_tests}"
+  fi
+  test_run_tracker::mark_test_result "$test_passed" "${failed_tests}"
+  return "$test_result"
+}
+
 # ==============================================================================
 # Health Checks
 # ==============================================================================
