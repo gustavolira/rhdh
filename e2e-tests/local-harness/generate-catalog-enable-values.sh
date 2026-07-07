@@ -56,14 +56,14 @@ if [[ -n "$CURATED_FILE" && -f "$CURATED_FILE" ]]; then
   curated_refs="$(grep -E '^[[:space:]]*-[[:space:]]+package:[[:space:]]*"?(oci://|\./dynamic-plugins/dist/)' "$CURATED_FILE" \
     | sed -E 's/^[[:space:]]*-[[:space:]]+package:[[:space:]]*"?//; s/"[[:space:]]*$//' || true)"
   while read -r ref; do
-    [ -z "$ref" ] && continue
+    [[ -z "$ref" ]] && continue
     curated_keys+="$(ref_key "$ref")"$'\n'
   done <<< "$curated_refs"
 fi
 
 refs="$("$DIR/catalog-index-refs.sh" "$IMAGE")"
 
-if [ -z "$refs" ]; then
+if [[ -z "$refs" ]]; then
   echo "No packages found in dynamic-plugins.default.yaml of ${IMAGE}" >&2
   exit 1
 fi
@@ -73,7 +73,7 @@ echo "global:"
 echo "  dynamic:"
 echo "    plugins:"
 while read -r ref; do
-  [ -z "$ref" ] && continue
+  [[ -z "$ref" ]] && continue
   key="$(ref_key "$ref")"
   if [[ -n "$curated_keys" ]] && grep -qxF "$key" <<< "$curated_keys"; then
     echo "# skipped (curated entry exists for '${key}'): ${ref}" >&2

@@ -24,7 +24,7 @@ trap 'rm -rf "$workdir"' EXIT
 
 refs="$("$DIR/catalog-index-refs.sh" "$CATALOG_INDEX_IMAGE")"
 
-if [ -z "$refs" ]; then
+if [[ -z "$refs" ]]; then
   echo "No packages found in dynamic-plugins.default.yaml of ${CATALOG_INDEX_IMAGE}" >&2
   exit 1
 fi

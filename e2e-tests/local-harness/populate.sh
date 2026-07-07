@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Resolve the config path against the CALLER's cwd before we cd to the repo
 # root, so relative arguments from any directory keep working.
-if [ "${CONFIG_SRC#/}" = "$CONFIG_SRC" ] && [ -f "$CONFIG_SRC" ]; then
+if [[ "${CONFIG_SRC#/}" == "$CONFIG_SRC" && -f "$CONFIG_SRC" ]]; then
   CONFIG_SRC="$(cd "$(dirname "$CONFIG_SRC")" && pwd)/$(basename "$CONFIG_SRC")"
 fi
 

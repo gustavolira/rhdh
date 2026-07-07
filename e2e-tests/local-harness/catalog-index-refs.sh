@@ -40,14 +40,14 @@ skopeo copy --override-os linux --override-arch amd64 \
 default_yaml=""
 for digest in $(jq -r '.layers[].digest' "${workdir}/idx/manifest.json"); do
   layer="${workdir}/idx/${digest#sha256:}"
-  [ -f "$layer" ] || continue
-  if content="$(tar -xOf "$layer" dynamic-plugins.default.yaml 2> /dev/null)" && [ -n "$content" ]; then
+  [[ -f "$layer" ]] || continue
+  if content="$(tar -xOf "$layer" dynamic-plugins.default.yaml 2> /dev/null)" && [[ -n "$content" ]]; then
     default_yaml="$content"
     break
   fi
 done
 
-if [ -z "$default_yaml" ]; then
+if [[ -z "$default_yaml" ]]; then
   echo "dynamic-plugins.default.yaml not found in ${IMAGE}" >&2
   exit 1
 fi
