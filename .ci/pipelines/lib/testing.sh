@@ -203,6 +203,38 @@ testing::run_tests() {
   return "$test_result"
 }
 
+# Scans RHDH pod logs in a namespace for dynamic-plugin startup failures and
+# prints a loud, grep-free summary naming each failed plugin. Backstage logs
+# "Plugin '<id>' threw an error during startup ..." / "Module <m> in Plugin
+# '<id>' threw an error ..." before the pod exits, so on CrashLoopBackOff the
+# culprit is in the PREVIOUS container logs (-p). Advisory only: never fails.
+# Args:
+#   $1 - namespace
+#   $2 - artifacts_subdir: where to save the summary artifact
+testing::report_plugin_startup_failures() {
+  local namespace=$1
+  local artifacts_subdir=$2
+  local out="/tmp/plugin-startup-failures-${namespace}.txt"
+
+  {
+    local pod
+    for pod in $(oc get pods -n "${namespace}" -o name 2> /dev/null | grep -E 'backstage|developer-hub' || true); do
+      # Current and previous (pre-crash) logs; either may not exist yet.
+      oc logs "${pod}" -n "${namespace}" --all-containers 2> /dev/null || true
+      oc logs "${pod}" -n "${namespace}" --all-containers -p 2> /dev/null || true
+    done
+  } | grep -E "threw an error during startup|Backend startup failed" | sort -u > "${out}" || true
+
+  if [[ -s "${out}" ]]; then
+    log::error "==================== PLUGIN STARTUP FAILURES (${namespace}) ===================="
+    cat "${out}"
+    log::error "==============================================================================="
+    common::save_artifact "${artifacts_subdir}" "${out}" || true
+  else
+    log::info "No dynamic-plugin startup failures found in ${namespace} pod logs."
+  fi
+}
+
 # Cluster-free plugin sanity check (RHIDP-13508): boots packages/backend from
 # source with every OCI plugin declared by the catalog index and verifies -
 # via /api/dynamic-plugins-info/loaded-plugins - that the product's dynamic
@@ -285,6 +317,16 @@ testing::run_plugin_sanity_check() {
   if [[ "${test_result}" -ne 0 ]]; then
     save_overall_result 1
     test_passed="false"
+    # The backend log streams through Playwright's webServer pipe into the run
+    # log; surface the per-plugin startup failures so nobody has to dig.
+    local failures_out="/tmp/plugin-startup-failures-cluster-free.txt"
+    grep -E "threw an error during startup|Backend startup failed" "/tmp/${LOGFILE}-plugin-sanity" | sort -u > "${failures_out}" || true
+    if [[ -s "${failures_out}" ]]; then
+      log::error "==================== PLUGIN STARTUP FAILURES (cluster-free) ===================="
+      cat "${failures_out}"
+      log::error "================================================================================="
+      common::save_artifact "${artifacts_subdir}" "${failures_out}" || true
+    fi
   fi
   local failed_tests="0"
   if [[ "${test_result}" -ne 0 ]]; then

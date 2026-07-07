@@ -20,9 +20,16 @@ yarn plugin-sanity
 
 CI runs it in the nightly OCP job, right after the cluster-based sanity-plugins
 deployment (`testing::run_plugin_sanity_check`); override the index via Gangway
-(`--catalog-index-image`) for RC verification. Plugins that cannot initialize in
-the standalone harness are documented in `local-harness/plugin-sanity-excludes.txt`;
-plugins that only need startup config get dummy values in `app-config.plugin-sanity.yaml`.
+(`--catalog-index-image`) for RC verification. The cluster-based deployment derives
+its enabled plugin set from the SAME index (`generate-catalog-enable-values.sh`
+merges a generated enable fragment under the curated values, which keep only
+env-specific `pluginConfig`), so both flavors track the index instead of a frozen
+list. Plugins that cannot initialize are documented in
+`local-harness/plugin-sanity-excludes.txt` (shared by both flavors); plugins that
+only need startup config get dummy values in `app-config.plugin-sanity.yaml`
+(cluster-free) or a curated entry in the diff values file (cluster). When a broken
+plugin takes the pod down, the nightly prints a "PLUGIN STARTUP FAILURES" summary
+naming the culprit (also saved as an artifact).
 
 ## Local Test Runner
 

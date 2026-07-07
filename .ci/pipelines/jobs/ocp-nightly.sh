@@ -62,9 +62,27 @@ run_runtime_config_change_tests() {
 }
 
 run_sanity_plugins_check() {
+  # Both sanity flavors derive their plugin set from the SAME catalog index:
+  # the cluster deployment (chart global.catalogIndex + generated enable
+  # values) and the cluster-free check below. Exported here, BEFORE the Helm
+  # install, so the chart receives it; overridable via Gangway
+  # (--catalog-index-image) for RC verification. Derived CATALOG_INDEX_*
+  # components mirror env_variables.sh (empty there when no override is set).
+  export CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-quay.io/rhdh/plugin-catalog-index:${RELEASE_VERSION}}"
+  CATALOG_INDEX_TAG="${CATALOG_INDEX_IMAGE##*:}"
+  _CI_WITHOUT_TAG="${CATALOG_INDEX_IMAGE%:*}"
+  CATALOG_INDEX_REGISTRY="${_CI_WITHOUT_TAG%%/*}"
+  CATALOG_INDEX_REPO="${_CI_WITHOUT_TAG#*/}"
+  export CATALOG_INDEX_TAG CATALOG_INDEX_REGISTRY CATALOG_INDEX_REPO
+  unset _CI_WITHOUT_TAG
+
   local sanity_plugins_url="https://${RELEASE_NAME}-developer-hub-${NAME_SPACE_SANITY_PLUGINS_CHECK}.${K8S_CLUSTER_ROUTER_BASE}"
   initiate_sanity_plugin_checks_deployment "${RELEASE_NAME}" "${NAME_SPACE_SANITY_PLUGINS_CHECK}" "${sanity_plugins_url}" "${PW_PROJECT_SHOWCASE_SANITY_PLUGINS}"
   testing::check_and_test "${RELEASE_NAME}" "${NAME_SPACE_SANITY_PLUGINS_CHECK}" "${PW_PROJECT_SHOWCASE_SANITY_PLUGINS}" "${sanity_plugins_url}"
+  # Name the culprit plugin(s) loudly when the deployment or tests failed -
+  # a broken plugin takes the whole pod down, and the answer is buried in the
+  # pod logs otherwise. Advisory: prints nothing fatal on healthy runs.
+  testing::report_plugin_startup_failures "${NAME_SPACE_SANITY_PLUGINS_CHECK}" "${PW_PROJECT_SHOWCASE_SANITY_PLUGINS}"
 
   # Cluster-free counterpart (RHIDP-13508): boots packages/backend from source
   # inside the test pod with EVERY plugin the catalog index declares and

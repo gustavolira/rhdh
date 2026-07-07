@@ -661,6 +661,31 @@ initiate_sanity_plugin_checks_deployment() {
   deploy_redis_cache "${name_space_sanity_plugins_check}"
   apply_yaml_files "${DIR}" "${name_space_sanity_plugins_check}" "${sanity_plugins_url}"
   helm::merge_values "overwrite" "${DIR}/value_files/${HELM_CHART_VALUE_FILE_NAME}" "${DIR}/value_files/${HELM_CHART_SANITY_PLUGINS_DIFF_VALUE_FILE_NAME}" "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}"
+
+  # RHIDP-13508: derive the enabled plugin set dynamically from the catalog
+  # index instead of the frozen hand-maintained list. The generated fragment
+  # (every package the index declares, disabled: false) is merged as the BASE
+  # and the curated values as the DIFF: helm::merge_values "merge" dedupes
+  # global.dynamic.plugins by .package with diff precedence, so curated
+  # entries keep their env-specific pluginConfig while every other index
+  # package gets enabled. helm::get_image_params passes the index to the
+  # chart, and the in-container install CLI resolves its default.yaml, so the
+  # installed set follows CATALOG_INDEX_IMAGE (RC override via Gangway).
+  if [[ -n "${CATALOG_INDEX_IMAGE:-}" ]]; then
+    if "${DIR}/../../e2e-tests/local-harness/generate-catalog-enable-values.sh" \
+      "${CATALOG_INDEX_IMAGE}" "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}" > /tmp/catalog-enable-values.yaml; then
+      common::save_artifact "${artifacts_subdir}" "/tmp/catalog-enable-values.yaml" || true
+      helm::merge_values "merge" "/tmp/catalog-enable-values.yaml" \
+        "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}" \
+        "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}.dynamic"
+      mv "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}.dynamic" \
+        "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}"
+      log::info "Sanity-plugins deployment: plugin set derived from ${CATALOG_INDEX_IMAGE}"
+    else
+      log::warn "Could not derive plugin set from ${CATALOG_INDEX_IMAGE} - falling back to the curated values file"
+    fi
+  fi
+
   common::save_artifact "${artifacts_subdir}" "/tmp/${HELM_CHART_SANITY_PLUGINS_MERGED_VALUE_FILE_NAME}" || true
   # shellcheck disable=SC2046
   helm upgrade -i "${release_name}" -n "${name_space_sanity_plugins_check}" \
