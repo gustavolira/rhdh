@@ -38,6 +38,14 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   oci://ghcr.io/x/argo-cd-backend:bs_1.49__4.8.0        -> argo-cd-backend
 #   oci://registry/x/argo-cd-backend@sha256:...!argocd    -> argo-cd-backend!argocd
 #   ./dynamic-plugins/dist/backstage-plugin-techdocs      -> backstage-plugin-techdocs
+#
+# The trailing `-dynamic` is stripped because the SAME plugin is named
+# differently by the two sources this dedup compares: the index ships
+# `…-module-msgraph` while the in-image dist directory (and therefore every
+# curated entry) is `…-module-msgraph-dynamic`. Without this the curated entry
+# and the index entry look like two plugins, both get enabled, and the install
+# CLI aborts the deployment with "Config key '…' defined differently for 2
+# dynamic plugins".
 ref_key() {
   local r="$1" suffix=""
   if [[ "$r" == *"!"* ]]; then
@@ -48,6 +56,7 @@ ref_key() {
   r="${r##*/}"
   r="${r%%@*}"
   r="${r%%:*}"
+  r="${r%-dynamic}"
   echo "${r}${suffix}"
 }
 
