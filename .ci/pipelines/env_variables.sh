@@ -158,6 +158,21 @@ RHDH_PR_OS_CLUSTER_TOKEN=$(cat /tmp/secrets/RHDH_PR_OS_CLUSTER_TOKEN)
 ENCODED_CLUSTER_NAME=$(echo "my-cluster" | base64)
 K8S_CLUSTER_API_SERVER_URL=$(printf "%s" "$K8S_CLUSTER_URL" | base64 | tr -d '\n')
 K8S_SERVICE_ACCOUNT_TOKEN=$K8S_CLUSTER_TOKEN_ENCODED
+
+# Values consumed by the pluginConfig the CATALOG INDEX ships for the plugins the
+# sanity-plugins deployment enables dynamically (RHIDP-13508). The index writes
+# `${K8S_CLUSTER_URL}` / `${K8S_CLUSTER_TOKEN}` / `${TECH_RADAR_DATA_URL}`; when a
+# referenced variable is not in the pod environment it expands to an empty string,
+# which fails config schema validation and takes the whole backend down (the
+# kubernetes clusterLocatorMethods `url` is a required property).
+#
+# The two K8S_* entries are aliases of the real values already computed above -
+# same secret, just under the names the index expects. TECH_RADAR_DATA_URL has no
+# real counterpart, so it gets an inert placeholder: the sanity check only needs
+# the plugins to INITIALIZE, it does not exercise them.
+K8S_CLUSTER_URL_ENCODED=$K8S_CLUSTER_API_SERVER_URL
+K8S_CLUSTER_TOKEN_PLAIN_ENCODED=$K8S_CLUSTER_TOKEN_ENCODED
+TECH_RADAR_DATA_URL_ENCODED=$(printf "%s" "https://example.com/tech-radar.json" | base64 | tr -d '\n')
 GOOGLE_CLIENT_ID=$(cat /tmp/secrets/GOOGLE_CLIENT_ID)
 GOOGLE_CLIENT_SECRET=$(cat /tmp/secrets/GOOGLE_CLIENT_SECRET)
 GOOGLE_ACC_COOKIE=$(cat /tmp/secrets/GOOGLE_ACC_COOKIE)
