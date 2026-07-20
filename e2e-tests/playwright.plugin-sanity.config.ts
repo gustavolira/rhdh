@@ -26,8 +26,8 @@ import { backendUrl, backendWebServer, isCI } from "./playwright/support/local-h
  */
 export default defineConfig({
   testDir: "./playwright",
-  // Fails fast if dynamic-plugins-root has not been populated.
-  globalSetup: "./playwright/support/local-harness-global-setup.ts",
+  // Fails fast if dynamic-plugins-root has not been populated FROM THE INDEX.
+  globalSetup: "./playwright/support/plugin-sanity-global-setup.ts",
   testMatch: ["e2e/plugin-dynamic-loading.spec.ts"],
   timeout: 120 * 1000,
   forbidOnly: isCI,

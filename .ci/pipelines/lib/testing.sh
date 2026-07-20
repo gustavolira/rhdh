@@ -203,6 +203,19 @@ testing::run_tests() {
   return "$test_result"
 }
 
+# Filters stdin down to the dynamic-plugin startup failures worth reporting.
+# Backstage emits three fatal shapes (createInitializationResultCollector):
+# "Plugin '<id>' threw an error during startup", "Module '<m>' in Plugin
+# '<id>' threw an error during startup", and "Plugin '<id>' reported failure
+# for module '<m>' during startup". The near-identical variants that end in
+# "boot failure is permitted ... so startup will continue" are NON-fatal and
+# must not be reported as failures.
+testing::_filter_plugin_startup_failures() {
+  grep -E "(threw an error|reported failure for module).*during startup|Backend startup failed" \
+    | grep -v "boot failure is permitted" \
+    | sort -u
+}
+
 # Scans RHDH pod logs in a namespace for dynamic-plugin startup failures and
 # prints a loud, grep-free summary naming each failed plugin. Backstage logs
 # "Plugin '<id>' threw an error during startup ..." / "Module <m> in Plugin
@@ -223,7 +236,7 @@ testing::report_plugin_startup_failures() {
       oc logs "${pod}" -n "${namespace}" --all-containers 2> /dev/null || true
       oc logs "${pod}" -n "${namespace}" --all-containers -p 2> /dev/null || true
     done
-  } | grep -E "threw an error during startup|Backend startup failed" | sort -u > "${out}" || true
+  } | testing::_filter_plugin_startup_failures > "${out}" || true
 
   if [[ -s "${out}" ]]; then
     log::error "==================== PLUGIN STARTUP FAILURES (${namespace}) ===================="
@@ -277,7 +290,13 @@ testing::run_plugin_sanity_check() {
     return 1
   fi
 
-  cd "${repo_root}/e2e-tests" || return 1
+  # Must record the failure like every other path here: a bare return would
+  # leave OVERALL_RESULT green while the tracker row says the run failed.
+  cd "${repo_root}/e2e-tests" || {
+    log::error "Could not enter ${repo_root}/e2e-tests"
+    save_overall_result 1
+    return 1
+  }
 
   if ! yarn install --immutable > /tmp/yarn.install.log.txt 2>&1; then
     log::error "=== YARN INSTALL FAILED ==="
@@ -320,7 +339,7 @@ testing::run_plugin_sanity_check() {
     # The backend log streams through Playwright's webServer pipe into the run
     # log; surface the per-plugin startup failures so nobody has to dig.
     local failures_out="/tmp/plugin-startup-failures-cluster-free.txt"
-    grep -E "threw an error during startup|Backend startup failed" "/tmp/${LOGFILE}-plugin-sanity" | sort -u > "${failures_out}" || true
+    testing::_filter_plugin_startup_failures < "/tmp/${LOGFILE}-plugin-sanity" > "${failures_out}" || true
     if [[ -s "${failures_out}" ]]; then
       log::error "==================== PLUGIN STARTUP FAILURES (cluster-free) ===================="
       cat "${failures_out}"

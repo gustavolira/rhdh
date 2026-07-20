@@ -21,4 +21,4 @@ red-hat-developer-hub-backstage-plugin-orchestrator-backend(@|:)
 
 # Module on the orchestrator backend plugin - excluded with its host plugin.
 # (Also requires orchestrator.workflowLogProvider.loki.baseUrl at startup.)
-red-hat-developer-hub-backstage-plugin-orchestrator-backend-module-loki
+red-hat-developer-hub-backstage-plugin-orchestrator-backend-module-loki(@|:)

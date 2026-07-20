@@ -59,13 +59,55 @@ QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
 # Override via Gangway for RC (e.g., --catalog-index-image quay.io/rhdh/plugin-catalog-index:1.9-60) or
 # GA verification (e.g., --catalog-index-image registry.access.redhat.com/rhdh/plugin-catalog-index:1.9.4).
 CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-}"
+
+# Splits an image ref into the registry/repository/tag components the Helm
+# chart needs (global.catalogIndex.image.*) and exports them. Single source of
+# truth - also called by the nightly sanity-plugins handler, which must export
+# the same components before the Helm install.
+#
+# Handles both `registry/repo:tag` and `registry/repo@sha256:...` refs: naive
+# `${ref##*:}` on a digest ref yields the bare hex as the "tag" and leaves
+# "@sha256" glued to the repository, which makes the chart pull a nonexistent
+# image. A ref with no registry (e.g. `rhdh/x:tag`) defaults to docker.io.
+# Args:
+#   $1 - image reference
+catalog_index::export_components() {
+  local ref=$1 without_digest first_component
+
+  if [[ "${ref}" == *"@"* ]]; then
+    # Digest ref: the chart takes the digest verbatim as the tag.
+    CATALOG_INDEX_TAG="${ref#*@}"
+    without_digest="${ref%@*}"
+  else
+    without_digest="${ref}"
+    # A colon is only a tag separator when it comes after the last slash
+    # (otherwise it is a registry port, e.g. localhost:5000/repo).
+    if [[ "${without_digest##*/}" == *":"* ]]; then
+      CATALOG_INDEX_TAG="${without_digest##*:}"
+      without_digest="${without_digest%:*}"
+    else
+      CATALOG_INDEX_TAG="latest"
+    fi
+  fi
+
+  first_component="${without_digest%%/*}"
+  # Per the OCI/Docker rule, the first component is a registry only when it
+  # looks like a host (contains a dot or a port) or is literally localhost.
+  if [[ "${without_digest}" == *"/"* &&
+    ("${first_component}" == *"."* || "${first_component}" == *":"* || "${first_component}" == "localhost") ]]; then
+    CATALOG_INDEX_REGISTRY="${first_component}"
+    CATALOG_INDEX_REPO="${without_digest#*/}"
+  else
+    CATALOG_INDEX_REGISTRY="docker.io"
+    CATALOG_INDEX_REPO="${without_digest}"
+  fi
+
+  export CATALOG_INDEX_TAG CATALOG_INDEX_REGISTRY CATALOG_INDEX_REPO
+}
+
 if [[ -n "${CATALOG_INDEX_IMAGE}" ]]; then
   # Derived components for Helm chart (requires separate registry/repository/tag)
-  CATALOG_INDEX_TAG="${CATALOG_INDEX_IMAGE##*:}"
-  _CI_WITHOUT_TAG="${CATALOG_INDEX_IMAGE%:*}"
-  CATALOG_INDEX_REGISTRY="${_CI_WITHOUT_TAG%%/*}"
-  CATALOG_INDEX_REPO="${_CI_WITHOUT_TAG#*/}"
-  unset _CI_WITHOUT_TAG
+  catalog_index::export_components "${CATALOG_INDEX_IMAGE}"
 fi
 
 # =============================================================================

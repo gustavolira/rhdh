@@ -103,6 +103,44 @@ export function loadManifest(installDir: string): PluginManifest {
   return { backend, frontend };
 }
 
+export type CatalogIndexExpectation = {
+  image: string;
+  expectedOciPackages: number;
+};
+
+/**
+ * Read the `.catalog-index-refs` breadcrumb written by
+ * local-harness/populate-catalog-index.sh, which records the index image and
+ * how many oci:// packages that run resolved.
+ *
+ * Without it the sanity check only asserts "installed ⊆ loaded", which stays
+ * green when the install silently underran (registry hiccup, over-broad
+ * exclude pattern, or dynamic-plugins-root left over from the curated
+ * `populate.sh`). Returns null when absent so a local curated run fails with a
+ * clear message rather than a type error.
+ */
+export function readCatalogIndexExpectation(installDir: string): CatalogIndexExpectation | null {
+  const refsPath = join(installDir, ".catalog-index-refs");
+  if (!existsSync(refsPath)) return null;
+
+  let image = "";
+  let expectedOciPackages = Number.NaN;
+  for (const line of readFileSync(refsPath, "utf8").split("\n")) {
+    const [key, ...rest] = line.split("=");
+    const value = rest.join("=").trim();
+    if (key === "image") image = value;
+    // Number("") is 0, so an empty value must stay NaN for the check below.
+    if (key === "expected_oci_packages" && value !== "") {
+      expectedOciPackages = Math.trunc(Number(value));
+    }
+  }
+
+  if (image === "" || Number.isNaN(expectedOciPackages)) {
+    throw new Error(`Malformed ${refsPath}: expected 'image=' and 'expected_oci_packages=' lines`);
+  }
+  return { image, expectedOciPackages };
+}
+
 /**
  * Validate that a frontend plugin has required bundle artifacts
  *

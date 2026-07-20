@@ -66,15 +66,11 @@ run_sanity_plugins_check() {
   # the cluster deployment (chart global.catalogIndex + generated enable
   # values) and the cluster-free check below. Exported here, BEFORE the Helm
   # install, so the chart receives it; overridable via Gangway
-  # (--catalog-index-image) for RC verification. Derived CATALOG_INDEX_*
-  # components mirror env_variables.sh (empty there when no override is set).
+  # (--catalog-index-image) for RC verification. The derived CATALOG_INDEX_*
+  # components come from the shared helper in env_variables.sh, which leaves
+  # them empty when no override is set.
   export CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-quay.io/rhdh/plugin-catalog-index:${RELEASE_VERSION}}"
-  CATALOG_INDEX_TAG="${CATALOG_INDEX_IMAGE##*:}"
-  _CI_WITHOUT_TAG="${CATALOG_INDEX_IMAGE%:*}"
-  CATALOG_INDEX_REGISTRY="${_CI_WITHOUT_TAG%%/*}"
-  CATALOG_INDEX_REPO="${_CI_WITHOUT_TAG#*/}"
-  export CATALOG_INDEX_TAG CATALOG_INDEX_REGISTRY CATALOG_INDEX_REPO
-  unset _CI_WITHOUT_TAG
+  catalog_index::export_components "${CATALOG_INDEX_IMAGE}"
 
   local sanity_plugins_url="https://${RELEASE_NAME}-developer-hub-${NAME_SPACE_SANITY_PLUGINS_CHECK}.${K8S_CLUSTER_ROUTER_BASE}"
   initiate_sanity_plugin_checks_deployment "${RELEASE_NAME}" "${NAME_SPACE_SANITY_PLUGINS_CHECK}" "${sanity_plugins_url}" "${PW_PROJECT_SHOWCASE_SANITY_PLUGINS}"

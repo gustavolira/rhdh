@@ -5,7 +5,7 @@
  * the real RHDH backend. Runs cluster-free: Playwright boots
  * `packages/backend` from source (playwright.plugin-sanity.config.ts), with
  * dynamic-plugins-root populated from CATALOG_INDEX_IMAGE by
- * local-harness/populate.sh, so the plugins go through the product's own
+ * local-harness/populate-catalog-index.sh, so the plugins go through the product's own
  * dynamicPluginsFeatureLoader — same Backstage line, same scanner, same
  * config stack as the shipped backend.
  *
@@ -28,16 +28,17 @@ import { test, expect } from "@support/coverage/test";
 import {
   loadManifest,
   parseLoadedPluginNames,
+  readCatalogIndexExpectation,
   validateFrontendBundles,
 } from "../utils/plugin-loader";
 
 // Known failures are handled at install time instead of here: a plugin that
 // throws during init aborts the whole backend, so plugins that cannot load in
-// this harness are excluded by populate-catalog-index.sh via
+// this harness are filtered out by local-harness/catalog-index-refs.sh via
 // local-harness/plugin-sanity-excludes.txt (each entry documents why).
 
-// populate.sh installs into <repo root>/dynamic-plugins-root; Playwright runs
-// with cwd e2e-tests.
+// populate-catalog-index.sh installs into <repo root>/dynamic-plugins-root;
+// Playwright runs with cwd e2e-tests.
 const DYNAMIC_PLUGINS_ROOT = resolve(process.cwd(), "..", "dynamic-plugins-root");
 
 test.describe("Plugin Dynamic Loading", () => {
@@ -60,6 +61,31 @@ test.describe("Plugin Dynamic Loading", () => {
 
       const expected = [...manifest.backend, ...manifest.frontend];
       expect(expected.length).toBeGreaterThan(0);
+
+      // The install must cover the WHOLE index, not just whatever happened to
+      // land: a partial install would otherwise pass this spec trivially.
+      const indexExpectation = readCatalogIndexExpectation(DYNAMIC_PLUGINS_ROOT);
+      expect(
+        indexExpectation,
+        "dynamic-plugins-root was not populated from the catalog index - run " +
+          "local-harness/populate-catalog-index.sh with CATALOG_INDEX_IMAGE set",
+      ).not.toBeNull();
+      // Narrowing for the type checker; the assertion above is the real gate.
+      if (indexExpectation === null) return;
+
+      console.log(`🗂️  Catalog index: ${indexExpectation.image}`);
+      if (process.env.CATALOG_INDEX_IMAGE !== undefined && process.env.CATALOG_INDEX_IMAGE !== "") {
+        expect(
+          indexExpectation.image,
+          "dynamic-plugins-root was populated from a different catalog index than " +
+            "CATALOG_INDEX_IMAGE - re-run populate-catalog-index.sh",
+        ).toBe(process.env.CATALOG_INDEX_IMAGE);
+      }
+      expect(
+        expected.length,
+        `installed plugin count should match the ${indexExpectation.expectedOciPackages} ` +
+          `oci:// packages declared by ${indexExpectation.image}`,
+      ).toBe(indexExpectation.expectedOciPackages);
 
       // Step 2: authenticate as guest (loaded-plugins requires user credentials)
       const refresh = await request.get("/api/auth/guest/refresh", {

@@ -10,7 +10,7 @@ import { resolve } from "path";
 import type { PlaywrightTestConfig } from "@playwright/test";
 
 export const backendUrl = "http://localhost:7007";
-export const backendReadiness = `${backendUrl}/.backstage/health/v1/readiness`;
+const backendReadiness = `${backendUrl}/.backstage/health/v1/readiness`;
 export const isCI = process.env.CI !== undefined && process.env.CI !== "";
 
 // backstage-cli / janus-cli live in the repo-root node_modules/.bin, which
