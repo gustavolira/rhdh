@@ -77,22 +77,58 @@ if [[ -z "$refs" ]]; then
   exit 1
 fi
 
+envscan_dir="$(mktemp -d)"
+trap 'rm -rf "$envscan_dir"' EXIT
+"$DIR/catalog-index-refs.sh" --dump-yaml "$IMAGE" > "${envscan_dir}/default.yaml"
+
+# Refs the index enables ITSELF (`enabled: true` in dynamic-plugins.default.yaml,
+# which the container loads via `includes:`). These are on regardless of what this
+# fragment says, so a curated entry for the same plugin under a DIFFERENT ref
+# (typically the ./dynamic-plugins/dist copy) means the module gets registered
+# twice and the backend dies with "is already registered". Skipping the ref here
+# does not help - only removing the curated entry does.
+index_enabled="$(
+  awk '
+    /^[[:space:]]*-[[:space:]]+package:/ {
+      ref = $0
+      sub(/^[[:space:]]*-[[:space:]]+package:[[:space:]]*"?/, "", ref)
+      sub(/"[[:space:]]*$/, "", ref)
+    }
+    /^[[:space:]]*enabled:[[:space:]]*true/ { if (ref != "") print ref }
+  ' "${envscan_dir}/default.yaml"
+)"
+
 # Build the plugin entries first: emitting the `plugins:` key with an empty body
 # yields `plugins: null`, which is a different shape from an empty list and would
 # make the downstream yq merge fragile.
 entries=""
 enabled_refs=""
+collisions=""
 while read -r ref; do
   [[ -z "$ref" ]] && continue
   key="$(ref_key "$ref")"
   if [[ -n "$curated_keys" ]] && grep -qxF "$key" <<< "$curated_keys"; then
     echo "# skipped (curated entry exists for '${key}'): ${ref}" >&2
+    if grep -qxF "$ref" <<< "$index_enabled"; then
+      collisions+="  - ${key} (index ref: ${ref})"$'\n'
+    fi
     continue
   fi
   entries+="      - package: \"$ref\""$'\n'
   entries+="        disabled: false"$'\n'
   enabled_refs+="${ref}"$'\n'
 done <<< "$refs"
+
+if [[ -n "$collisions" ]]; then
+  {
+    echo "# ERROR: the catalog index enables these packages itself (enabled: true), and"
+    echo "# the curated values file enables the SAME plugin under a different ref. Both"
+    echo "# will be installed and the module registered twice, which aborts startup with"
+    echo "# \"is already registered\". Remove the curated entry - the index already covers it:"
+    printf '%s' "$collisions"
+  } >&2
+  exit 1
+fi
 
 # The index ships pluginConfig with ${VAR} placeholders. A variable that is not
 # in the pod environment expands to an EMPTY STRING, which fails config schema
@@ -101,10 +137,7 @@ done <<< "$refs"
 # packages need so the next index bump is a one-line fix instead of an outage.
 # (Supply them in .ci/pipelines/auth/secrets-rhdh-secrets.yaml; a dummy value is
 # fine, the sanity check only needs the plugins to initialize.)
-envscan_dir="$(mktemp -d)"
-trap 'rm -rf "$envscan_dir"' EXIT
 printf '%s' "$enabled_refs" > "${envscan_dir}/refs"
-"$DIR/catalog-index-refs.sh" --dump-yaml "$IMAGE" > "${envscan_dir}/default.yaml"
 
 # Two-file awk: `awk -v` cannot carry embedded newlines portably.
 needed_vars="$(
