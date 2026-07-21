@@ -172,7 +172,34 @@ K8S_SERVICE_ACCOUNT_TOKEN=$K8S_CLUSTER_TOKEN_ENCODED
 # the plugins to INITIALIZE, it does not exercise them.
 K8S_CLUSTER_URL_ENCODED=$K8S_CLUSTER_API_SERVER_URL
 K8S_CLUSTER_TOKEN_PLAIN_ENCODED=$K8S_CLUSTER_TOKEN_ENCODED
-TECH_RADAR_DATA_URL_ENCODED=$(printf "%s" "https://example.com/tech-radar.json" | base64 | tr -d '\n')
+
+# Aliases: the index uses different names for values the secret already carries.
+KEYCLOAK_BASE_URL_ENCODED=$KEYCLOAK_AUTH_BASE_URL
+KEYCLOAK_CLIENT_ID_ENCODED=$KEYCLOAK_AUTH_CLIENTID
+KEYCLOAK_CLIENT_SECRET_ENCODED=$KEYCLOAK_AUTH_CLIENT_SECRET
+KEYCLOAK_LOGIN_REALM_ENCODED=$KEYCLOAK_AUTH_LOGIN_REALM
+KEYCLOAK_REALM_ENCODED=$KEYCLOAK_AUTH_REALM
+GITHUB_WEBHOOK_SECRET_ENCODED=$GITHUB_APP_WEBHOOK_SECRET
+
+# Placeholders: no real counterpart exists. The sanity check only needs the
+# plugins to INITIALIZE - it never exercises these integrations, and the
+# providers that do try to reach out (LDAP, msgraph) already fail harmlessly at
+# runtime with the curated `temp` values. Run generate-catalog-enable-values.sh
+# after an index bump: it names any variable added here that is still missing.
+common::b64() { printf "%s" "$1" | base64 | tr -d '\n'; }
+TECH_RADAR_DATA_URL_ENCODED=$(common::b64 "https://example.com/tech-radar.json")
+BACKSTAGE_VERSION_ENCODED=$(common::b64 "1.0.0")
+RHDH_VERSION_ENCODED=$(common::b64 "1.0.0")
+EMAIL_HOSTNAME_ENCODED=$(common::b64 "smtp.example.com")
+EMAIL_USERNAME_ENCODED=$(common::b64 "temp")
+EMAIL_PASSWORD_ENCODED=$(common::b64 "temp")
+EMAIL_SENDER_ENCODED=$(common::b64 "noreply@example.com")
+GITLAB_HOST_ENCODED=$(common::b64 "gitlab.com")
+GITLAB_DISCOVERY_GROUP_ENCODED=$(common::b64 "temp")
+RHDH_EXTENSIONS_DIRECTORY_ENCODED=$(common::b64 "./dynamic-plugins-root")
+RHDH_EXTENSIONS_INSTALL_EXPORT_PATH_ENCODED=$(common::b64 "./dynamic-plugins-root")
+SEGMENT_TEST_MODE_ENCODED=$(common::b64 "true")
+SEGMENT_WRITE_KEY_ENCODED=$(common::b64 "temp")
 GOOGLE_CLIENT_ID=$(cat /tmp/secrets/GOOGLE_CLIENT_ID)
 GOOGLE_CLIENT_SECRET=$(cat /tmp/secrets/GOOGLE_CLIENT_SECRET)
 GOOGLE_ACC_COOKIE=$(cat /tmp/secrets/GOOGLE_ACC_COOKIE)

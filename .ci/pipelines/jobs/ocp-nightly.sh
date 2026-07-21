@@ -69,7 +69,27 @@ run_sanity_plugins_check() {
   # (--catalog-index-image) for RC verification. The derived CATALOG_INDEX_*
   # components come from the shared helper in env_variables.sh, which leaves
   # them empty when no override is set.
-  export CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-quay.io/rhdh/plugin-catalog-index:${RELEASE_VERSION}}"
+  #
+  # The default is the index the chart values ALREADY pin - not
+  # plugin-catalog-index:${RELEASE_VERSION}. The chart uses the index's
+  # dynamic-plugins.default.yaml as its `includes` file, which is where every
+  # ./dynamic-plugins/dist plugin gets its default pluginConfig. A branch-matched
+  # tag is not interchangeable: :next currently carries 9 packages and zero dist
+  # refs, versus 53 packages and 41 dist refs in the pinned :1.10. Pointing the
+  # deployment at it silently stripped the dynamicRoutes of every in-image plugin
+  # - the home page 404'd and the smoke test failed.
+  if [[ -z "${CATALOG_INDEX_IMAGE:-}" ]]; then
+    local pinned_index
+    pinned_index="$(yq -r '
+      [.global.catalogIndex.image.registry, "/", .global.catalogIndex.image.repository, ":", .global.catalogIndex.image.tag] | join("")
+    ' "${DIR}/value_files/${HELM_CHART_VALUE_FILE_NAME}" 2> /dev/null)"
+    if [[ -z "${pinned_index}" || "${pinned_index}" == *null* ]]; then
+      log::error "Could not read global.catalogIndex.image from ${HELM_CHART_VALUE_FILE_NAME}"
+      return 1
+    fi
+    export CATALOG_INDEX_IMAGE="${pinned_index}"
+  fi
+  log::info "Sanity plugins catalog index: ${CATALOG_INDEX_IMAGE}"
   catalog_index::export_components "${CATALOG_INDEX_IMAGE}"
 
   local sanity_plugins_url="https://${RELEASE_NAME}-developer-hub-${NAME_SPACE_SANITY_PLUGINS_CHECK}.${K8S_CLUSTER_ROUTER_BASE}"
