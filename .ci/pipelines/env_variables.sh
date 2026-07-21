@@ -186,20 +186,23 @@ GITHUB_WEBHOOK_SECRET_ENCODED=$GITHUB_APP_WEBHOOK_SECRET
 # providers that do try to reach out (LDAP, msgraph) already fail harmlessly at
 # runtime with the curated `temp` values. Run generate-catalog-enable-values.sh
 # after an index bump: it names any variable added here that is still missing.
-common::b64() { printf "%s" "$1" | base64 | tr -d '\n'; }
-TECH_RADAR_DATA_URL_ENCODED=$(common::b64 "https://example.com/tech-radar.json")
-BACKSTAGE_VERSION_ENCODED=$(common::b64 "1.0.0")
-RHDH_VERSION_ENCODED=$(common::b64 "1.0.0")
-EMAIL_HOSTNAME_ENCODED=$(common::b64 "smtp.example.com")
-EMAIL_USERNAME_ENCODED=$(common::b64 "temp")
-EMAIL_PASSWORD_ENCODED=$(common::b64 "temp")
-EMAIL_SENDER_ENCODED=$(common::b64 "noreply@example.com")
-GITLAB_HOST_ENCODED=$(common::b64 "gitlab.com")
-GITLAB_DISCOVERY_GROUP_ENCODED=$(common::b64 "temp")
-RHDH_EXTENSIONS_DIRECTORY_ENCODED=$(common::b64 "./dynamic-plugins-root")
-RHDH_EXTENSIONS_INSTALL_EXPORT_PATH_ENCODED=$(common::b64 "./dynamic-plugins-root")
-SEGMENT_TEST_MODE_ENCODED=$(common::b64 "true")
-SEGMENT_WRITE_KEY_ENCODED=$(common::b64 "temp")
+# Local helper, deliberately NOT in the common:: namespace: lib/common.sh owns
+# that prefix (and already has common::base64_encode), but it is sourced via
+# utils.sh - after this file - so it is not available here yet.
+placeholder_b64() { printf "%s" "$1" | base64 | tr -d '\n'; }
+TECH_RADAR_DATA_URL_ENCODED=$(placeholder_b64 "https://example.com/tech-radar.json")
+BACKSTAGE_VERSION_ENCODED=$(placeholder_b64 "1.0.0")
+RHDH_VERSION_ENCODED=$(placeholder_b64 "1.0.0")
+EMAIL_HOSTNAME_ENCODED=$(placeholder_b64 "smtp.example.com")
+EMAIL_USERNAME_ENCODED=$(placeholder_b64 "temp")
+EMAIL_PASSWORD_ENCODED=$(placeholder_b64 "temp")
+EMAIL_SENDER_ENCODED=$(placeholder_b64 "noreply@example.com")
+GITLAB_HOST_ENCODED=$(placeholder_b64 "gitlab.com")
+GITLAB_DISCOVERY_GROUP_ENCODED=$(placeholder_b64 "temp")
+RHDH_EXTENSIONS_DIRECTORY_ENCODED=$(placeholder_b64 "./dynamic-plugins-root")
+RHDH_EXTENSIONS_INSTALL_EXPORT_PATH_ENCODED=$(placeholder_b64 "./dynamic-plugins-root")
+SEGMENT_TEST_MODE_ENCODED=$(placeholder_b64 "true")
+SEGMENT_WRITE_KEY_ENCODED=$(placeholder_b64 "temp")
 GOOGLE_CLIENT_ID=$(cat /tmp/secrets/GOOGLE_CLIENT_ID)
 GOOGLE_CLIENT_SECRET=$(cat /tmp/secrets/GOOGLE_CLIENT_SECRET)
 GOOGLE_ACC_COOKIE=$(cat /tmp/secrets/GOOGLE_ACC_COOKIE)
