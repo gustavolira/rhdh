@@ -53,9 +53,5 @@ red-hat-developer-hub-backstage-plugin-orchestrator-backend-module-loki(@|:)
 # Re-check periodically with:
 #   skopeo inspect --no-creds docker://quay.io/rhdh/<name>:<tag>
 # and delete the entry the moment it resolves.
-red-hat-developer-hub-backstage-plugin-homepage(@|:)
-red-hat-developer-hub-backstage-plugin-intelligent-assistant(@|:)
-red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend(@|:)
 
 # TODO(RHDHBUGS-3678): https://redhat.atlassian.net/browse/RHDHBUGS-3678
-backstage-community-plugin-auth-backend-module-keycloak-provider(@|:)
